@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Alarm Fatigue Patient Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="sidebar">
+    <img class="logo" src="assests/university-logo.png" alt="University Logo" />
+    <h2>Choose Type of Ward</h2>
+    <div class="ward-btn-group">
+      <button class="ward-btn active" data-ward="general">General Ward</button>
+      <button class="ward-btn" data-ward="critical">Critical Ward</button>
+    </div>
+    <div class="patient-list" id="patient-list">
+      <!-- Patient items are dynamically inserted here -->
+    </div>
+  </div>
+
+  <div class="main-content">
+    <h1 id="patient-title">General Ward Patients</h1>
+    <div class="desc" id="ward-desc">
+      Patient details and medication updates will appear here.
+    </div>
+    
+    <!-- Testing Controls -->
+    <div class="testing-controls">
+      <h3>System Testing</h3>
+      <button onclick="generateRandomProfile()" class="test-btn">Generate Random Patient</button>
+      <button onclick="connectWebSocket()" class="test-btn">Reconnect WebSocket</button>
+      <div class="system-status">
+        <div>Backend Status: <span id="backend-status">Unknown</span></div>
+        <div>ESP32 #1: <span id="esp32-1-status">Offline</span></div>
+        <div>ESP32 #2: <span id="esp32-2-status">Offline</span></div>
+      </div>
+    </div>
+    
+    <div class="patient-details" id="patient-details">
+      Select a patient from the left to view more information.
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

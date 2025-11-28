@@ -1,0 +1,275 @@
+body {
+  margin: 0;
+  display: flex;
+  min-height: 100vh;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #f5f6fa;
+}
+
+.sidebar {
+  width: 250px;
+  background: #212d3b;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 20px;
+  min-height: 100vh;
+}
+
+.logo {
+  width: 180px;
+  margin-bottom: 30px;
+}
+
+.sidebar h2 {
+  margin: 0 0 20px 0;
+  font-size: 1.2rem;
+  text-align: center;
+  font-weight: normal;
+  letter-spacing: 0.5px;
+}
+
+.ward-btn-group {
+  display: flex;
+  flex-direction: column;
+  width: 90%;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+
+.ward-btn {
+  padding: 12px 0;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  background: #25344a;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.ward-btn.active,
+.ward-btn:hover {
+  background: #1abc9c;
+  color: #fff;
+}
+
+.patient-list {
+  width: 90%;
+  margin-bottom: 20px;
+  flex-grow: 1;
+}
+
+.patient-title {
+  font-size: 1rem;
+  margin: 5px 0 8px 0;
+  color: #bbc6d1;
+  font-weight: 600;
+}
+
+.patient-card {
+  background: #fff;
+  color: #212d3b;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  transition: background 0.15s, color 0.15s;
+  border-left: 4px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.patient-card.selected,
+.patient-card:hover {
+  background: #e9f8f6;
+  border-left: 4px solid #1abc9c;
+  color: #1abc9c;
+}
+
+.main-content {
+  flex: 1;
+  padding: 40px 32px;
+  background: #fff;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.main-content h1 {
+  font-size: 2rem;
+  margin: 0 0 20px 0;
+}
+
+.main-content .desc {
+  color: #555;
+  font-size: 1.1rem;
+  margin-bottom: 30px;
+}
+
+.patient-details {
+  background: #f5f6fa;
+  padding: 20px;
+  border-radius: 8px;
+  min-height: 120px;
+  box-shadow: 0 1px 3px rgba(30, 44, 62, 0.04);
+}
+
+@media (max-width: 800px) {
+  .sidebar {
+    width: 100px;
+    padding-top: 10px;
+  }
+
+  .logo,
+  .sidebar h2,
+  .patient-title {
+    display: none;
+  }
+
+  .ward-btn-group,
+  .patient-list {
+    width: 90%;
+  }
+
+  .patient-card {
+    font-size: 0.97rem;
+    padding: 10px 8px;
+  }
+}
+
+/* Real-time vitals styling */
+#vitals-display {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 15px 0;
+}
+
+#vitals-display h4 {
+  margin: 0 0 10px 0;
+  color: #333;
+}
+
+.vital-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.vital-item:last-child {
+  border-bottom: none;
+}
+
+.vital-timestamp {
+  font-size: 0.9rem;
+  color: #666;
+  text-align: center;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Alarm status styling */
+#alarm-status {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 15px 0;
+  text-align: center;
+}
+
+.alarm-normal {
+  background: #d4edda;
+  color: #155724;
+  padding: 10px;
+  border-radius: 5px;
+  font-weight: bold;
+}
+
+.alarm-critical {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 10px;
+  border-radius: 5px;
+  font-weight: bold;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.5; }
+}
+
+/* Testing controls styling */
+.testing-controls {
+  background: #e8f4fd;
+  border: 1px solid #bee5eb;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 20px 0;
+}
+
+.testing-controls h3 {
+  margin: 0 0 15px 0;
+  color: #0c5460;
+}
+
+.test-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin: 0 5px 10px 0;
+  transition: background 0.3s;
+}
+
+.test-btn:hover {
+  background: #0056b3;
+}
+
+.system-status {
+  margin-top: 15px;
+}
+
+.system-status div {
+  margin: 5px 0;
+  font-size: 0.9rem;
+}
+
+/* Connection status styling */
+.status-connected {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.status-disconnected {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+@media (max-width: 600px) {
+  .main-content {
+    padding: 18px 5px;
+  }
+  
+  .testing-controls {
+    padding: 10px;
+  }
+  
+  .test-btn {
+    display: block;
+    width: 100%;
+    margin: 5px 0;
+  }
+}
