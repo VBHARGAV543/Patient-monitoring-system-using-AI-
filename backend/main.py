@@ -1,26 +1,25 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from schemas import CriticalPatientData, GeneralPatientData, PredictRequest, RealSensorData
+from schemas import (
+    CriticalPatientData, GeneralPatientData, PredictRequest, RealSensorData,
+    PatientAdmit, PatientResponse, AlarmEventResponse,
+    NurseRegister, NurseProximityUpdate, NurseSessionResponse,
+    VitalSignsLog, MockMLPrediction
+)
+import database
+import alarm_policy
+import mock_data
+import disease_profiles
 import joblib
 import pandas as pd
 import os
 import json
-import random
-from typing import Any, Dict, List
+import uuid
+import asyncio
+from typing import Any, Dict, List, Optional
 from datetime import datetime
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Hospital Alarm Fatigue Monitoring API")
-
-# CORS middleware for frontend communication
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-alarm_toggle_counter = 0
 # Load ML models
 CRITICAL_MODEL_PATH = os.path.join(os.path.dirname(__file__), '../ML/critical_model.pkl')
 GENERAL_MODEL_PATH = os.path.join(os.path.dirname(__file__), '../ML/general_model.pkl')
@@ -39,175 +38,938 @@ except Exception as e:
     print(f"❌ Failed to load general model: {e}")
     general_model = None
 
-# WebSocket connection manager for real-time updates
+
+# Lifespan context manager for database initialization
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await database.init_db()
+    
+    # Reload patient profiles for any active patients
+    try:
+        patient = await database.get_active_patient()
+        if patient and patient.get('disease'):
+            print(f"🔄 Reloading profile for active patient: {patient['name']} (ID: {patient['id']})")
+            ward_type = "critical" if patient['patient_type'] == "CRITICAL" else "general"
+            profile = disease_profiles.generate_patient_profile(
+                age=patient['age'],
+                gender=patient['gender'],
+                disease=patient['disease'],
+                ward_type=ward_type,
+                body_strength=patient.get('body_strength') or "average",
+                genetic_condition=patient.get('genetic_condition') or "healthy",
+                allergies=patient.get('allergies') or []
+            )
+            patient_profiles[patient['id']] = profile
+            patient_admission_times[patient['id']] = patient['admission_time']
+            print(f"✅ Profile reloaded for patient {patient['id']}")
+    except Exception as e:
+        print(f"⚠️ Error reloading patient profiles: {e}")
+    
+    # Start background vital signs simulation
+    vital_task = asyncio.create_task(simulate_vitals_background())
+    
+    yield
+    
+    # Shutdown
+    vital_task.cancel()
+    await database.close_db()
+
+
+app = FastAPI(title="Hospital Alarm Fatigue Monitoring API", lifespan=lifespan)
+
+# CORS middleware for frontend communication
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# WebSocket connection managers
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
+        self.nurse_connections: Dict[str, WebSocket] = {}
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def connect_nurse(self, session_id: str, websocket: WebSocket):
+        await websocket.accept()
+        self.nurse_connections[session_id] = websocket
+
+    def disconnect_nurse(self, session_id: str):
+        if session_id in self.nurse_connections:
+            del self.nurse_connections[session_id]
 
     async def broadcast(self, message: dict):
+        """Broadcast to main dashboard connections"""
         for connection in self.active_connections:
             try:
                 await connection.send_text(json.dumps(message))
             except:
                 pass
 
+    async def send_to_nurse(self, session_id: str, message: dict):
+        """Send message to specific nurse session"""
+        if session_id in self.nurse_connections:
+            try:
+                await self.nurse_connections[session_id].send_text(json.dumps(message))
+            except:
+                pass
+
+
 manager = ConnectionManager()
 
-# Random patient profile generator
-def generate_random_patient_profile():
-    """Generate random patient profile for tampering real sensor data"""
-    profiles = [
-        {
-            "type": "healthy_young",
-            "conditions": [],
-            "medications": [],
-            "age": random.randint(18, 35),
-            "vitals_modifiers": {
-                "HR": lambda x: x + random.randint(-5, 5),
-                "O2": lambda x: min(100, x + random.randint(0, 2)),
-                "Temp": lambda x: x + random.uniform(-0.2, 0.2),
-                "BP_sys": lambda x: random.randint(110, 130),
-                "BP_dia": lambda x: random.randint(70, 85),
-                "Glucose": lambda x: random.randint(80, 100)
-            }
-        },
-        {
-            "type": "diabetic_elderly",
-            "conditions": ["diabetes", "mild_hypertension"],
-            "medications": ["metformin", "lisinopril"],
-            "age": random.randint(60, 80),
-            "vitals_modifiers": {
-                "HR": lambda x: x + random.randint(10, 25),
-                "O2": lambda x: x - random.randint(0, 3),
-                "Temp": lambda x: x + random.uniform(-0.3, 0.5),
-                "BP_sys": lambda x: random.randint(140, 170),
-                "BP_dia": lambda x: random.randint(85, 95),
-                "Glucose": lambda x: random.randint(160, 250)
-            }
-        },
-        {
-            "type": "cardiac_critical",
-            "conditions": ["cardiac_arrhythmia", "heart_failure"],
-            "medications": ["beta_blocker", "ace_inhibitor", "diuretic"],
-            "age": random.randint(55, 75),
-            "vitals_modifiers": {
-                "HR": lambda x: x + random.randint(30, 50),
-                "O2": lambda x: x - random.randint(8, 15),
-                "Temp": lambda x: x + random.uniform(0.0, 1.5),
-                "BP_sys": lambda x: random.randint(90, 120),
-                "BP_dia": lambda x: random.randint(50, 70),
-                "Glucose": lambda x: random.randint(90, 140),
-                "ECG": lambda x: 1,  # Abnormal
-                "NeurologicalScore": lambda x: random.randint(8, 12)
-            }
-        },
-        {
-            "type": "post_surgery",
-            "conditions": ["post_operative", "pain_management"],
-            "medications": ["morphine", "antibiotics"],
-            "age": random.randint(30, 70),
-            "vitals_modifiers": {
-                "HR": lambda x: x + random.randint(15, 30),
-                "O2": lambda x: x - random.randint(2, 8),
-                "Temp": lambda x: x + random.uniform(0.5, 2.0),
-                "BP_sys": lambda: random.randint(100, 140),
-                "BP_dia": lambda x: random.randint(60, 90),
-                "Glucose": lambda x: random.randint(100, 160)
-            }
-        }
-    ]
-    
-    return random.choice(profiles)
+# Global vital signs simulators for active patients
+vital_simulators: Dict[int, mock_data.VitalSignsSimulator] = {}
+patient_profiles: Dict[int, disease_profiles.PatientProfile] = {}
+patient_admission_times: Dict[int, datetime] = {}
 
-def tamper_real_readings(real_vitals: dict, patient_profile: dict) -> dict:
-    """Modify real sensor data based on random patient conditions"""
-    
-    tampered_vitals = real_vitals.copy()
-    modifiers = patient_profile["vitals_modifiers"]
-    
-    # Apply modifications based on patient profile
-    for vital, modifier in modifiers.items():
-        if vital in ["HR", "O2", "Temp"] and vital in tampered_vitals:
-            # Apply modifier to existing real vital (pass the current value)
-            tampered_vitals[vital] = modifier(tampered_vitals[vital])
-        elif vital == "O2" and "SpO2" in tampered_vitals:
-            # Handle SpO2 to O2 mapping
-            tampered_vitals[vital] = modifier(tampered_vitals["SpO2"])
-        else:
-            # Add new vital sign that wasn't measured by sensors (pass dummy value)
-            try:
-                tampered_vitals[vital] = modifier(0)
-            except TypeError:
-                # Handle lambda functions that don't expect parameters
-                tampered_vitals[vital] = modifier()
-    
-    # Ensure realistic bounds
-    tampered_vitals["HR"] = max(40, min(200, tampered_vitals.get("HR", 75)))
-    tampered_vitals["O2"] = max(70, min(100, tampered_vitals.get("O2", 98)))
-    tampered_vitals["Temp"] = max(35, min(42, tampered_vitals.get("Temp", 37)))
-    
-    # Add default values for missing critical care parameters
-    if "ECG" not in tampered_vitals:
-        tampered_vitals["ECG"] = 0  # Normal by default
-    if "NeurologicalScore" not in tampered_vitals:
-        tampered_vitals["NeurologicalScore"] = 15  # Normal score
-    
-    return tampered_vitals
-
-def prepare_ml_features(tampered_vitals: dict, patient_profile: dict, ward: str) -> dict:
-    """Convert tampered vitals to ML model expected format with EXACT column order"""
-    
-    if ward == "general":
-        # Exact order from training: BP_sys, BP_dia, HR, Glucose, O2, Temp, nurse_nearby, disease_* (after get_dummies)
-        ml_features = {}
-        
-        # Base features in exact training order
-        ml_features["BP_sys"] = tampered_vitals.get("BP_sys", 120)
-        ml_features["BP_dia"] = tampered_vitals.get("BP_dia", 80) 
-        ml_features["HR"] = tampered_vitals.get("HR", 75)
-        ml_features["Glucose"] = tampered_vitals.get("Glucose", 100)
-        ml_features["O2"] = tampered_vitals.get("SpO2", tampered_vitals.get("O2", 98))  # Map SpO2 to O2
-        ml_features["Temp"] = tampered_vitals.get("Temp", 37)
-        ml_features["nurse_nearby"] = tampered_vitals.get("nurse_nearby", 0)
-        
-        # Disease features (one-hot encoded) - model expects all disease columns
-        patient_conditions = [c.lower() for c in patient_profile.get("conditions", [])]
-        
-        ml_features["disease_Diabetes"] = 1 if "diabetes" in patient_conditions else 0
-        ml_features["disease_Hypertension"] = 1 if "hypertension" in patient_conditions else 0
-        ml_features["disease_Mild Pneumonia"] = 1 if "mild pneumonia" in patient_conditions or "pneumonia" in patient_conditions else 0
+# Background task for simulating vital signs
+async def simulate_vitals_background():
+    """Background task that continuously generates vital signs for active patients"""
+    print("🚀 Starting vital signs background task...")
+    while True:
+        try:
+            # Get active patient
+            patient = await database.get_active_patient()
             
-    elif ward == "critical":
-        # Critical ward feature order (check critical training file for exact order)
-        ml_features = {}
-        ml_features["BP_sys"] = tampered_vitals.get("BP_sys", 120)
-        ml_features["BP_dia"] = tampered_vitals.get("BP_dia", 80)
-        ml_features["HR"] = tampered_vitals.get("HR", 75)
-        ml_features["O2"] = tampered_vitals.get("SpO2", tampered_vitals.get("O2", 98))
-        ml_features["Temp"] = tampered_vitals.get("Temp", 37)
-        ml_features["ECG"] = tampered_vitals.get("ECG", 0)
-        ml_features["NeurologicalScore"] = tampered_vitals.get("NeurologicalScore", 15)
-        ml_features["nurse_nearby"] = tampered_vitals.get("nurse_nearby", 0)
+            if patient:
+                print(f"✅ Active patient found: {patient['name']} (ID: {patient['id']}, Type: {patient['patient_type']})")
+                patient_id = patient['id']
+                
+                # Use disease profile system if available
+                if patient_id in patient_profiles:
+                    print(f"✅ Using disease profile for patient {patient_id}")
+                    profile = patient_profiles[patient_id]
+                    admission_time = patient_admission_times[patient_id]
+                    hours_since_admission = (datetime.now() - admission_time).total_seconds() / 3600
+                    
+                    # Calculate current vitals based on disease profile
+                    vitals_dict = disease_profiles.calculate_current_vitals(profile, hours_since_admission)
+                    
+                    # Format vitals for system (both formats for compatibility)
+                    vitals = {
+                        'HR': int(vitals_dict['HR']),
+                        'SpO2': int(vitals_dict['SpO2']),
+                        'Temp': round(vitals_dict['Temp'], 1),
+                        'BP_sys': int(vitals_dict['BP_sys']),
+                        'BP_dia': int(vitals_dict['BP_dia']),
+                        'RR': int(vitals_dict['RR']),
+                        'Glucose': int(vitals_dict['Glucose'])
+                    }
+                    
+                else:
+                    # Fall back to old simulator system
+                    # Create simulator if doesn't exist
+                    if patient_id not in vital_simulators:
+                        vital_simulators[patient_id] = mock_data.VitalSignsSimulator(
+                            patient_id=patient_id,
+                            patient_type=patient['patient_type'],
+                            demo_scenario=patient.get('demo_scenario')
+                        )
+                    
+                    # Generate new vitals
+                    vitals = vital_simulators[patient_id].generate_next_reading()
+                
+                # Log to database (map keys to database column names)
+                await database.log_vital_signs(
+                    patient_id=patient_id,
+                    heart_rate=int(vitals['HR']),
+                    spo2=int(vitals['SpO2']),
+                    temperature=float(vitals['Temp']),
+                    bp_systolic=int(vitals['BP_sys']),
+                    bp_diastolic=int(vitals['BP_dia']),
+                    respiratory_rate=int(vitals['RR']),
+                    blood_glucose=int(vitals['Glucose'])
+                )
+                
+                # Run ML prediction on vitals
+                ml_prediction = mock_data.mock_ml_prediction(vitals, patient['patient_type'])
+                
+                print(f"📊 Vitals generated: HR={vitals['HR']}, SpO2={vitals['SpO2']}, Temp={vitals['Temp']}, Prediction={ml_prediction['prediction']}")
+                
+                # Prepare vital update message with patient_type
+                vital_update_msg = {
+                    "event": "vital_signs_update",
+                    "patient_id": patient_id,
+                    "patient_name": patient['name'],
+                    "patient_type": patient['patient_type'],
+                    "vitals": vitals,
+                    "ml_prediction": ml_prediction,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                # Broadcast to dashboard
+                await manager.broadcast(vital_update_msg)
+                print(f"📡 Broadcasted vital update to {len(manager.active_connections)} dashboard connections")
+                
+                # Broadcast to all connected nurses
+                for session_id in list(manager.nurse_connections.keys()):
+                    try:
+                        await manager.send_to_nurse(session_id, vital_update_msg)
+                        print(f"📡 Sent vital update to nurse {session_id}")
+                    except Exception as e:
+                        print(f"Failed to send to nurse {session_id}: {e}")
+                
+                # Check if alarm should trigger
+                if ml_prediction['prediction'] == 1:
+                    print(f"🚨 ALARM TRIGGERED - Patient: {patient['name']}, Type: {patient['patient_type']}")
+                    
+                    alarm_msg = {
+                        "event": "alarm_triggered",
+                        "patient_id": patient_id,
+                        "patient_name": patient['name'],
+                        "patient_type": patient['patient_type'],
+                        "vitals": vitals,
+                        "prediction": ml_prediction,
+                        "timestamp": datetime.now().isoformat(),
+                        "band_id": patient.get('band_id', 'UNKNOWN'),
+                        "notification_title": "🚨 Proximity Alert",
+                        "notification_message": f"You are near {patient['name']} - Patient alarm triggered due to concerning vitals"
+                    }
+                    
+                    # Broadcast to dashboard
+                    await manager.broadcast(alarm_msg)
+                    print(f"📡 Broadcasted alarm to dashboard")
+                    
+                    # For GENERAL ward, check proximity before sending to nurses
+                    if patient['patient_type'] == 'GENERAL':
+                        # Get patient's band_id
+                        patient_band_id = patient.get('band_id', 'UNKNOWN')
+                        print(f"🔍 Checking nurse proximity for {patient_band_id}...")
+                        
+                        # Check which nurses are in proximity to this patient's band
+                        for session_id in list(manager.nurse_connections.keys()):
+                            # Get nurse proximity data from database
+                            nurse_session = await database.get_nurse_session(session_id)
+                            if nurse_session:
+                                nearby_devices = nurse_session.get('ble_devices_nearby', [])
+                                print(f"   Nurse {session_id[:8]}... nearby devices: {nearby_devices}")
+                                
+                                if patient_band_id in nearby_devices:
+                                    try:
+                                        await manager.send_to_nurse(session_id, alarm_msg)
+                                        print(f"🔔 ALARM SENT to nurse {session_id[:8]}... (in proximity to {patient_band_id})")
+                                        print(f"   📦 Alarm message: {json.dumps(alarm_msg, default=str)}")
+                                    except Exception as e:
+                                        print(f"Failed to send alarm to nurse {session_id}: {e}")
+                                else:
+                                    print(f"   Nurse {session_id[:8]}... NOT in proximity, skipping alarm")
+                    else:
+                        # For CRITICAL ward, send to all nurses
+                        print(f"📡 Broadcasting alarm to all {len(manager.nurse_connections)} nurses (CRITICAL ward)")
+                        for session_id in list(manager.nurse_connections.keys()):
+                            try:
+                                await manager.send_to_nurse(session_id, alarm_msg)
+                                print(f"🔔 Alarm sent to nurse {session_id[:8]}...")
+                            except Exception as e:
+                                print(f"Failed to send alarm to nurse {session_id}: {e}")
+            else:
+                print("⏸️ No active patient found, waiting...")
+            
+            # Wait 8 seconds before next reading
+            await asyncio.sleep(8)
+            
+        except Exception as e:
+            print(f"❌ Error in vital signs simulation: {e}")
+            import traceback
+            traceback.print_exc()
+            await asyncio.sleep(8)
+
+
+# ========== DISEASE SELECTION APIs ==========
+
+@app.get("/api/diseases/{ward_type}")
+async def get_diseases(ward_type: str) -> List[str]:
+    """Get available diseases for a ward type"""
+    if ward_type == "critical":
+        return list(disease_profiles.CRITICAL_WARD_DISEASES.keys())
+    elif ward_type == "general":
+        return list(disease_profiles.GENERAL_WARD_DISEASES.keys())
+    else:
+        raise HTTPException(status_code=400, detail="Invalid ward_type")
+
+@app.get("/api/diseases/{ward_type}/{disease_name}")
+async def get_disease_info(ward_type: str, disease_name: str):
+    """Get detailed information about a disease"""
+    disease_db = disease_profiles.CRITICAL_WARD_DISEASES if ward_type == "critical" else disease_profiles.GENERAL_WARD_DISEASES
     
-    return ml_features
+    if disease_name not in disease_db:
+        raise HTTPException(status_code=404, detail="Disease not found")
+    
+    return disease_db[disease_name]
+
+
+# ========== PATIENT LIFECYCLE APIs ==========
+
+@app.post("/api/patient/admit", response_model=PatientResponse)
+async def admit_patient(patient: PatientAdmit):
+    """
+    Admit a new patient and bind BAND_01
+    Auto-generates realistic medical profile based on disease selection
+    """
+    try:
+        # Check if band is available
+        if not await database.is_band_available():
+            raise HTTPException(
+                status_code=400,
+                detail="BAND_01 is currently assigned to another patient. Please discharge the current patient first."
+            )
+        
+        # Initialize patient data
+        patient_data = {
+            "name": patient.name,
+            "age": patient.age,
+            "problem": patient.problem,
+            "patient_type": patient.patient_type,
+            "demo_mode": patient.demo_mode,
+            "demo_scenario": patient.demo_scenario,
+        }
+        
+        # Use disease profile system if disease is specified
+        if patient.disease:
+            try:
+                # Generate realistic patient profile based on disease
+                ward_type = "critical" if patient.patient_type == "CRITICAL" else "general"
+                profile = disease_profiles.generate_patient_profile(
+                    age=patient.age,
+                    gender=patient.gender or "Male",
+                    disease=patient.disease,
+                    ward_type=ward_type,
+                    body_strength=patient.body_strength or "average",
+                    genetic_condition=patient.genetic_condition or "healthy",
+                    allergies=patient.allergies or []
+                )
+                
+                # Store profile for vital simulation
+                # We'll use patient_id after creation, stored in patient_profiles dict
+                
+                # Generate mock profile for missing demographic data
+                mock_profile = mock_data.generate_patient_profile(patient.patient_type)
+                
+                # Clean medications - remove vitals_effect before storing in DB
+                clean_medications = [
+                    {
+                        "name": med["name"],
+                        "dosage": med["dosage"],
+                        "frequency": med["frequency"]
+                    }
+                    for med in profile.medications
+                ]
+                
+                # Use profile data
+                patient_data.update({
+                    "gender": profile.gender,
+                    "blood_type": patient.blood_type or mock_profile.get("blood_type"),
+                    "weight": patient.weight or mock_profile.get("weight"),
+                    "height": patient.height or mock_profile.get("height"),
+                    "medical_history": [profile.disease] + (patient.medical_history or []),
+                    "allergies": profile.allergies,
+                    "current_medications": clean_medications,
+                    "emergency_contact": patient.emergency_contact or mock_profile.get("emergency_contact"),
+                    "emergency_phone": patient.emergency_phone or mock_profile.get("emergency_phone"),
+                    "disease": profile.disease,
+                    "body_strength": profile.body_strength,
+                    "genetic_condition": profile.genetic_condition
+                })
+                
+                print(f"✅ Disease profile created: {profile.disease} for {ward_type} ward")
+                
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+                
+        # Generate mock medical data if in demo mode (fallback for old system)
+        elif patient.demo_mode:
+            mock_profile = mock_data.generate_patient_profile(patient.patient_type)
+            
+            # Merge mock data with admission data
+            patient_data.update({
+                "gender": patient.gender or mock_profile.get("gender"),
+                "blood_type": patient.blood_type or mock_profile.get("blood_type"),
+                "weight": patient.weight or mock_profile.get("weight"),
+                "height": patient.height or mock_profile.get("height"),
+                "medical_history": patient.medical_history or mock_profile.get("medical_history"),
+                "allergies": patient.allergies or mock_profile.get("allergies"),
+                "current_medications": patient.current_medications or mock_profile.get("current_medications"),
+                "emergency_contact": patient.emergency_contact or mock_profile.get("emergency_contact"),
+                "emergency_phone": patient.emergency_phone or mock_profile.get("emergency_phone"),
+                "disease": patient.disease,
+                "body_strength": patient.body_strength,
+                "genetic_condition": patient.genetic_condition
+            })
+        else:
+            # Use provided data only
+            patient_data.update({
+                "gender": patient.gender,
+                "blood_type": patient.blood_type,
+                "weight": patient.weight,
+                "height": patient.height,
+                "medical_history": patient.medical_history,
+                "allergies": patient.allergies,
+                "current_medications": patient.current_medications,
+                "emergency_contact": patient.emergency_contact,
+                "emergency_phone": patient.emergency_phone,
+                "disease": patient.disease,
+                "body_strength": patient.body_strength,
+                "genetic_condition": patient.genetic_condition
+            })
+        
+        # Create patient record
+        patient_record = await database.create_patient(**patient_data)
+        
+        # Store profile if using disease system
+        if patient.disease:
+            ward_type = "critical" if patient.patient_type == "CRITICAL" else "general"
+            profile = disease_profiles.generate_patient_profile(
+                age=patient.age,
+                gender=patient_record['gender'],
+                disease=patient.disease,
+                ward_type=ward_type,
+                body_strength=patient_record['body_strength'] or "average",
+                genetic_condition=patient_record['genetic_condition'] or "healthy",
+                allergies=patient_record['allergies'] or []
+            )
+            patient_profiles[patient_record['id']] = profile
+            patient_admission_times[patient_record['id']] = datetime.now()
+        
+        # Assign band to patient
+        band_assignment = await database.assign_band_to_patient(patient_record['id'])
+        
+        # Initialize vital signs simulator (for old system compatibility)
+        vital_simulators[patient_record['id']] = mock_data.VitalSignsSimulator(
+            patient_id=patient_record['id'],
+            patient_type=patient_record['patient_type'],
+            demo_scenario=patient_record.get('demo_scenario')
+        )
+        
+        # Combine patient and band info
+        response = PatientResponse(
+            **patient_record,
+            band_id=band_assignment['band_id'],
+            assigned_at=band_assignment['assigned_at']
+        )
+        
+        # Broadcast admission event to dashboard
+        await manager.broadcast({
+            "event": "patient_admitted",
+            "patient": response.dict()
+        })
+        
+        print(f"✅ Patient admitted: {patient.name} (ID: {patient_record['id']}) - BAND_01 assigned")
+        if patient.disease:
+            print(f"   Disease: {patient.disease}, Profile-based vitals enabled")
+            print(f"🎭 Mock medical profile generated for {patient.name}")
+        
+        return response
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to admit patient: {str(e)}")
+
+
+@app.post("/api/patient/discharge/{patient_id}")
+async def discharge_patient(patient_id: int):
+    """
+    Discharge a patient and release BAND_01
+    """
+    try:
+        # Get patient info before discharge (raw data, no validation)
+        patient = await database.get_patient_by_id(patient_id)
+        if not patient:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        
+        if patient.get('status') == 'DISCHARGED':
+            raise HTTPException(status_code=400, detail="Patient already discharged")
+        
+        # Remove vital simulator
+        if patient_id in vital_simulators:
+            del vital_simulators[patient_id]
+        
+        # Discharge patient and release band
+        success = await database.discharge_patient(patient_id)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to discharge patient")
+        
+        # Broadcast discharge event
+        await manager.broadcast({
+            "event": "patient_discharged",
+            "patient_id": patient_id,
+            "name": patient['name']
+        })
+        
+        print(f"✅ Patient discharged: {patient['name']} (ID: {patient_id}) - BAND_01 released")
+        
+        return {
+            "status": "success",
+            "message": f"Patient {patient['name']} discharged successfully",
+            "patient_id": patient_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to discharge patient: {str(e)}")
+
+
+@app.get("/api/patient/active", response_model=Optional[PatientResponse])
+async def get_active_patient():
+    """
+    Get currently active patient with band assignment
+    """
+    try:
+        patient = await database.get_active_patient()
+        
+        if not patient:
+            return None
+        
+        # Clean medications to remove vitals_effect (backward compatibility)
+        if patient.get('current_medications'):
+            cleaned_meds = []
+            for med in patient['current_medications']:
+                if isinstance(med, dict):
+                    # Remove vitals_effect if present
+                    cleaned_med = {
+                        "name": med.get("name", ""),
+                        "dosage": med.get("dosage", ""),
+                        "frequency": med.get("frequency", "")
+                    }
+                    cleaned_meds.append(cleaned_med)
+            patient['current_medications'] = cleaned_meds
+        
+        # Debug: print patient data
+        print(f"📋 Patient data from DB (cleaned): {patient}")
+        
+        return PatientResponse(**patient)
+        
+    except Exception as e:
+        print(f"❌ Error in get_active_patient: {str(e)}")
+        print(f"❌ Patient data that caused error: {patient if 'patient' in locals() else 'No data'}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch active patient: {str(e)}")
+
+
+@app.get("/api/patient/{patient_id}", response_model=PatientResponse)
+async def get_patient(patient_id: int):
+    """
+    Get specific patient by ID
+    """
+    try:
+        patient = await database.get_patient_by_id(patient_id)
+        
+        if not patient:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        
+        return PatientResponse(**patient)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch patient: {str(e)}")
+
+
+@app.get("/api/patient/{patient_id}/alarm-history", response_model=List[AlarmEventResponse])
+async def get_patient_alarm_history(patient_id: int, limit: int = 50):
+    """
+    Get alarm event history for a patient
+    """
+    try:
+        events = await database.get_patient_alarm_history(patient_id, limit)
+        return [AlarmEventResponse(**event) for event in events]
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch alarm history: {str(e)}")
+
+
+@app.get("/api/patient/{patient_id}/vitals", response_model=List[VitalSignsLog])
+async def get_patient_vitals(patient_id: int, limit: int = 100):
+    """
+    Get vital signs history for a patient
+    """
+    try:
+        vitals = await database.get_patient_vital_history(patient_id, limit)
+        return [VitalSignsLog(**vital) for vital in vitals]
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch vital signs: {str(e)}")
+
+
+@app.get("/api/patient/{patient_id}/vitals/latest")
+async def get_patient_latest_vitals(patient_id: int):
+    """
+    Get most recent vital signs for a patient
+    """
+    try:
+        vitals = await database.get_latest_vitals(patient_id)
+        
+        if not vitals:
+            raise HTTPException(status_code=404, detail="No vital signs found for patient")
+        
+        return VitalSignsLog(**vitals)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch latest vitals: {str(e)}")
+
+
+@app.post("/api/patient/{patient_id}/vitals/simulate")
+async def simulate_patient_vitals(patient_id: int, scenario: str = "NORMAL"):
+    """
+    Manually trigger vital signs simulation for a patient
+    Scenario options: NORMAL, MILD_DETERIORATION, CRITICAL_EMERGENCY, FALSE_POSITIVE
+    """
+    try:
+        # Get patient info
+        patient = await database.get_patient_by_id(patient_id)
+        if not patient:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        
+        if patient['status'] != 'ACTIVE':
+            raise HTTPException(status_code=400, detail="Can only simulate vitals for active patients")
+        
+        # Generate mock vitals with specified scenario
+        vitals = mock_data.generate_mock_vitals(
+            patient_type=patient['patient_type'],
+            demo_scenario=scenario
+        )
+        
+        # Log to database (map keys to database column names)
+        await database.log_vital_signs(
+            patient_id=patient_id,
+            heart_rate=int(vitals['HR']),
+            spo2=int(vitals['SpO2']),
+            temperature=float(vitals['Temp']),
+            bp_systolic=int(vitals['BP_sys']),
+            bp_diastolic=int(vitals['BP_dia']),
+            respiratory_rate=int(vitals['RR']),
+            blood_glucose=int(vitals['Glucose'])
+        )
+        
+        # Generate ML prediction
+        ml_prediction = mock_data.mock_ml_prediction(vitals, patient['patient_type'])
+        
+        # Broadcast to dashboard
+        await manager.broadcast({
+            "event": "vital_signs_update",
+            "patient_id": patient_id,
+            "patient_name": patient['name'],
+            "vitals": vitals,
+            "ml_prediction": ml_prediction,
+            "scenario": scenario,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        return {
+            "status": "success",
+            "patient_id": patient_id,
+            "vitals": vitals,
+            "ml_prediction": ml_prediction,
+            "scenario": scenario
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to simulate vitals: {str(e)}")
+
+
+@app.get("/api/patients/discharged", response_model=List[PatientResponse])
+async def get_discharged_patients(limit: Optional[int] = None):
+    """
+    Get discharged patient history (all records by default, optional limit)
+    """
+    try:
+        patients = await database.get_discharged_patients(limit)
+        
+        # Add band_id and assigned_at as None for discharged patients (band was released)
+        for patient in patients:
+            if 'band_id' not in patient:
+                patient['band_id'] = None
+            if 'assigned_at' not in patient:
+                patient['assigned_at'] = None
+        
+        return [PatientResponse(**patient) for patient in patients]
+        
+    except Exception as e:
+        print(f"❌ Error in get_discharged_patients: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch discharged patients: {str(e)}")
+
+
+@app.get("/api/patients/statistics")
+async def get_patient_statistics():
+    """
+    Get patient admission/discharge statistics
+    """
+    try:
+        stats = await database.get_patient_statistics()
+        return stats
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch statistics: {str(e)}")
+
+
+# ========== NURSE PROXIMITY APIs ==========
+
+@app.post("/api/nurse/register", response_model=NurseSessionResponse)
+async def register_nurse(nurse: NurseRegister):
+    """
+    Register nurse device for proximity monitoring
+    """
+    try:
+        session_id = str(uuid.uuid4())
+        print(f"🔵 Registering nurse with session_id: {session_id}, device: {nurse.device_info}")
+        
+        session = await database.create_nurse_session(session_id, nurse.device_info)
+        print(f"✅ Nurse registered successfully: {session}")
+        
+        return NurseSessionResponse(
+            session_id=session['session_id'],
+            device_info=session['device_info'],
+            registered_at=session['registered_at'],
+            last_proximity_update=None,
+            ble_devices_nearby=[],
+            in_proximity=False
+        )
+        
+    except Exception as e:
+        print(f"❌ Nurse registration failed: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to register nurse: {str(e)}")
+
+
+@app.post("/api/nurse/proximity")
+async def update_nurse_proximity(proximity: NurseProximityUpdate):
+    """
+    Update nurse proximity with detected BLE devices
+    """
+    try:
+        print(f"🔵 Proximity update - session_id: {proximity.session_id}, devices: {proximity.ble_devices_nearby}")
+        
+        # Auto-create session if it doesn't exist (handles Android app session_id mismatch)
+        success = await database.update_nurse_proximity(proximity.session_id, proximity.ble_devices_nearby)
+        if not success:
+            print(f"⚠️ Session not found, creating: {proximity.session_id}")
+            await database.create_nurse_session(proximity.session_id, "Auto-created from proximity")
+            success = await database.update_nurse_proximity(proximity.session_id, proximity.ble_devices_nearby)
+        
+        return {
+            "status": "success",
+            "session_id": proximity.session_id,
+            "devices_detected": len(proximity.ble_devices_nearby)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update proximity: {str(e)}")
+
+
+@app.get("/api/nurse/status/{session_id}", response_model=NurseSessionResponse)
+async def get_nurse_status(session_id: str):
+    """
+    Get nurse session status and proximity info
+    """
+    try:
+        session = await database.get_nurse_session(session_id)
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Nurse session not found")
+        
+        # Check if nurse is currently in proximity
+        in_proximity = await database.check_nurse_proximity()
+        
+        return NurseSessionResponse(**session, in_proximity=in_proximity)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch nurse status: {str(e)}")
+
+
+# ========== SENSOR DATA & ALARM PROCESSING ==========
+
+@app.post("/api/sensor-data")
+async def receive_sensor_data(sensor_data: RealSensorData):
+    """
+    Main endpoint for ESP32 sensor data
+    1. Validates band assignment
+    2. Retrieves active patient context
+    3. Applies demo tampering if enabled
+    4. Runs ML prediction
+    5. Evaluates alarm policy with BLE proximity
+    6. Logs alarm event
+    7. Routes alerts appropriately
+    """
+    try:
+        # Step 1: Get active patient assigned to this band
+        patient = await database.get_patient_by_band(sensor_data.band_id)
+        
+        if not patient:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Band {sensor_data.band_id} is not assigned to any active patient. Please admit a patient first."
+            )
+        
+        # Step 2: Prepare vitals
+        vitals = {
+            "HR": sensor_data.HR,
+            "SpO2": sensor_data.SpO2,
+            "Temp": sensor_data.Temp,
+            "BP_sys": 120,  # Default values (would come from additional sensors)
+            "BP_dia": 80,
+            "Glucose": 100
+        }
+        
+        # Step 3: Apply demo tampering if enabled
+        if patient['demo_mode'] and patient['demo_scenario']:
+            vitals = alarm_policy.apply_demo_tampering(
+                vitals,
+                patient['demo_scenario'],
+                patient['patient_type']
+            )
+        
+        # Step 4: Format for ML model
+        ml_features = alarm_policy.format_vitals_for_ml(vitals, patient['patient_type'])
+        df = pd.DataFrame([ml_features])
+        
+        # Step 5: Run ML prediction
+        if patient['patient_type'] == "CRITICAL" and critical_model:
+            prediction = int(critical_model.predict(df)[0])
+        elif patient['patient_type'] == "GENERAL" and general_model:
+            prediction = int(general_model.predict(df)[0])
+        else:
+            raise HTTPException(status_code=500, detail="ML model not available")
+        
+        # Step 6: Check nurse proximity
+        nurses_in_proximity = await database.get_nurses_in_proximity(sensor_data.band_id)
+        nurse_in_ble_range = len(nurses_in_proximity) > 0
+        
+        # Step 7: Evaluate alarm policy
+        alarm_decision = alarm_policy.evaluate_alarm(
+            patient_type=patient['patient_type'],
+            vitals=vitals,
+            ml_prediction=prediction,
+            nurse_in_ble_range=nurse_in_ble_range,
+            nurse_sessions=nurses_in_proximity
+        )
+        
+        # Step 8: Log alarm event
+        alarm_event = await database.log_alarm_event(
+            patient_id=patient['id'],
+            vitals=vitals,
+            alarm_status=alarm_decision.action,
+            proximity_alert_sent=alarm_decision.route_to_nurse,
+            nurse_in_proximity=nurse_in_ble_range
+        )
+        
+        # Step 9: Route alerts
+        result = {
+            "patient_id": patient['id'],
+            "patient_name": patient['name'],
+            "patient_type": patient['patient_type'],
+            "vitals": vitals,
+            "ml_prediction": prediction,
+            "alarm_decision": alarm_decision.dict(),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # Send to nurse proximity alerts
+        if alarm_decision.route_to_nurse:
+            for nurse_session in alarm_decision.nurse_sessions:
+                await manager.send_to_nurse(nurse_session, {
+                    "type": "VIBRATION_ALERT",
+                    "patient": patient['name'],
+                    "vitals": vitals,
+                    "message": alarm_decision.message
+                })
+        
+        # Broadcast to dashboard
+        if alarm_decision.route_to_dashboard or alarm_decision.action == "SUPPRESS":
+            await manager.broadcast(result)
+        
+        print(f"📊 Sensor data processed - Patient: {patient['name']}, Action: {alarm_decision.action}")
+        
+        return {
+            "status": "success",
+            "alarm_event_id": alarm_event['id'],
+            "result": result
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process sensor data: {str(e)}")
+
+
+# ========== WebSocket Endpoints ==========
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    """Main dashboard WebSocket connection"""
     await manager.connect(websocket)
     try:
         while True:
             data = await websocket.receive_text()
             # Echo back for testing
-            await websocket.send_text(f"Message received: {data}")
+            await websocket.send_text(f"Connected to dashboard WebSocket")
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+
+@app.websocket("/ws/nurse/{session_id}")
+async def nurse_websocket_endpoint(session_id: str, websocket: WebSocket):
+    """Nurse proximity alert WebSocket connection"""
+    await manager.connect_nurse(session_id, websocket)
+    print(f"🟢 Nurse WebSocket connected: {session_id}")
+    try:
+        # Send initial connection confirmation
+        try:
+            await websocket.send_text(json.dumps({
+                "event": "connected",
+                "session_id": session_id,
+                "message": "Nurse WebSocket connected successfully"
+            }))
+            print(f"✅ Sent connection confirmation to {session_id}")
+        except Exception as e:
+            print(f"⚠️ Failed to send initial message to {session_id}: {e}")
+        
+        # Keep connection alive by waiting for disconnect or messages
+        while True:
+            try:
+                # Wait for messages with timeout to check connection health
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                print(f"📩 Received from nurse {session_id}: {data}")
+                # Echo back or handle nurse app messages if needed
+            except asyncio.TimeoutError:
+                # Send heartbeat to keep connection alive
+                try:
+                    await websocket.send_text(json.dumps({"event": "heartbeat", "timestamp": datetime.now().isoformat()}))
+                    print(f"💓 Sent heartbeat to {session_id}")
+                except:
+                    print(f"⚠️ Failed to send heartbeat to {session_id}, connection may be dead")
+                    break
+                continue
+    except WebSocketDisconnect:
+        print(f"🔴 Nurse WebSocket disconnected: {session_id}")
+        manager.disconnect_nurse(session_id)
+    except Exception as e:
+        print(f"❌ Nurse WebSocket error for {session_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        manager.disconnect_nurse(session_id)
+
+
+# ========== LEGACY ENDPOINTS (for backward compatibility) ==========
 
 @app.post("/predict_critical")
 def predict_critical(data: CriticalPatientData):
@@ -221,6 +983,7 @@ def predict_critical(data: CriticalPatientData):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/predict_general")  
 def predict_general(data: GeneralPatientData):
     if not general_model:
@@ -233,123 +996,50 @@ def predict_general(data: GeneralPatientData):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/alarm-status")
-async def get_alarm_status():
-    """
-    Endpoint for ESP32 #2 to check if alarms should be activated
-    """
-    global alarm_toggle_counter
-    alarm_toggle_counter += 1
-    if alarm_toggle_counter % 2 == 0:
-        return {
-            "general_alarm": True,
-            "critical_alarm": False,
-            "timestamp": datetime.now().isoformat(),
-            "message": "Forced general alarm (test mode)"
-        }
-    else:
-        return {
-            "general_alarm": False,
-            "critical_alarm": False,
-            "timestamp": datetime.now().isoformat(),
-            "message": "No alarms currently needed"
-        }
-
-@app.post("/api/sensor-data")
-async def receive_sensor_data(sensor_data: RealSensorData):
-    """
-    ESP32 sensor data endpoint - receives real sensor readings
-    """
-    try:
-        # Convert to dict for processing
-        real_vitals = {
-            "HR": sensor_data.HR,
-            "SpO2": sensor_data.SpO2, 
-            "Temp": sensor_data.Temp,
-            "nurse_nearby": sensor_data.nurse_nearby,
-            "ward": sensor_data.ward
-        }
-        
-        # Process through the main prediction pipeline
-        result = await predict_new_patient(real_vitals)
-        return {"status": "success", "message": "Data received and processed", "result": result}
-        
-    except Exception as e:
-        return {"status": "error", "message": f"Error processing sensor data: {str(e)}"}
-
-@app.post("/predict_new_patient")
-async def predict_new_patient(real_vitals: dict):
-    """
-    Main endpoint for ESP32 integration:
-    1. Receives real sensor data
-    2. Generates random patient profile  
-    3. Tampers readings based on profile
-    4. Runs ML prediction
-    5. Broadcasts results to frontend
-    """
-    
-    # Step 1: Generate random patient profile
-    patient_profile = generate_random_patient_profile()
-    
-    # Step 2: Tamper real readings based on profile
-    tampered_vitals = tamper_real_readings(real_vitals, patient_profile)
-    
-    # Step 3: Determine ward type and add missing fields
-    ward = real_vitals.get("ward", "general")
-    tampered_vitals["nurse_nearby"] = real_vitals.get("nurse_nearby", 0)
-    
-    # Step 4: Prepare data for ML model
-    try:
-        # Convert tampered vitals to ML model format
-        ml_features = prepare_ml_features(tampered_vitals, patient_profile, ward)
-        df = pd.DataFrame([ml_features])
-        
-        # Debug: Print feature info
-        print(f"🔍 ML Features for {ward} ward:")
-        print(f"   Columns: {list(df.columns)}")
-        print(f"   Values: {df.iloc[0].to_dict()}")
-        
-        if ward == "critical" and critical_model:
-            prediction = critical_model.predict(df)[0]
-        elif ward == "general" and general_model:
-            prediction = general_model.predict(df)[0]
-        else:
-            raise HTTPException(status_code=500, detail=f"No model available for {ward} ward")
-        
-        # Step 5: Prepare response
-        result = {
-            "alarm_status": int(prediction),
-            "patient_story": {
-                "type": patient_profile["type"],
-                "conditions": patient_profile["conditions"],
-                "medications": patient_profile["medications"],
-                "age": patient_profile["age"]
-            },
-            "original_vitals": real_vitals,
-            "tampered_vitals": tampered_vitals,
-            "ward": ward,
-            "timestamp": datetime.now().isoformat(),
-            "patient_id": f"P{random.randint(1000, 9999)}"
-        }
-        
-        # Step 6: Broadcast to frontend via WebSocket
-        await manager.broadcast(result)
-        
-        return result
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"ML prediction failed: {str(e)}")
 
 @app.get("/")
 def root():
     return {
-        "message": "Hospital Alarm Fatigue Monitoring API",
+        "message": "Hospital Alarm Fatigue Monitoring API - Patient-Centric System with Mock Data",
         "status": "running",
         "models": {
             "critical": "loaded" if critical_model else "failed",
             "general": "loaded" if general_model else "failed"
+        },
+        "endpoints": {
+            "patient_management": [
+                "/api/patient/admit", 
+                "/api/patient/discharge/{id}", 
+                "/api/patient/active",
+                "/api/patient/{id}",
+                "/api/patients/discharged",
+                "/api/patients/statistics"
+            ],
+            "vital_signs": [
+                "/api/patient/{id}/vitals",
+                "/api/patient/{id}/vitals/latest",
+                "/api/patient/{id}/vitals/simulate"
+            ],
+            "alarm_history": [
+                "/api/patient/{id}/alarm-history"
+            ],
+            "nurse_proximity": [
+                "/api/nurse/register", 
+                "/api/nurse/proximity", 
+                "/api/nurse/status/{session_id}"
+            ],
+            "sensor_data": ["/api/sensor-data"],
+            "websockets": ["/ws", "/ws/nurse/{session_id}"]
+        },
+        "features": {
+            "mock_data": "Auto-generates realistic medical profiles, vital signs, and ML predictions",
+            "vital_simulation": "Background task generates vital signs every 8 seconds for active patients",
+            "medical_history": "Complete patient profiles with conditions, allergies, medications",
+            "discharged_history": "Unlimited patient records - all data permanently stored",
+            "alarm_policy": "ML-based with BLE proximity routing"
         }
     }
+
 
 if __name__ == "__main__":
     import uvicorn
