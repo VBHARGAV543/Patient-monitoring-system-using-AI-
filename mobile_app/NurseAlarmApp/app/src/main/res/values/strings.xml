@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">NurseAlarmApp</string>
+    <string name="status_connecting_critical_ward">Status: Connecting to Critical Ward...</string>
+    <string name="monitoring_all_critical_patients">Monitoring all critical patients</string>
+    <string name="status_connected_monitoring_active">Status: ● Connected - Monitoring Active</string>
+    <string name="status_disconnected">Status: ○ Disconnected</string>
+    <string name="total_alarms_today">Total Alarms Today: %d</string>
+    <string name="active_alerts_none">Active Alerts:
+No critical alarms at this time.
+Monitoring all patients...</string>
+    <string name="active_alerts_header">Active Alerts:</string>
+    <string name="vitals_hr_spo2_temp_bp">HR: %s bpm | SpO2: %s%% | Temp: %s°C | BP: %s/%s</string>
+    <string name="risk_level">Risk: %s</string>
+    <string name="risk_factors">Factors: %s</string>
+    <string name="unknown">Unknown</string>
+    <string name="notification_critical_alert_title">Critical Alert: %s</string>
+    <string name="critical_alert_details">🆘 %s - %s
+%s
+%s
+%s</string>
+</resources>
