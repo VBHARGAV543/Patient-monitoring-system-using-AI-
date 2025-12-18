@@ -118,9 +118,8 @@ Next improvements
 - Add persistent logging of alarm events to a file or DB for analysis.
 - Add unit tests for backend ML mapping and a Dockerfile for easier deployment.
 
-Want a polished README or a one-page demo handout?
--------------------------------------------------
-I can generate a 1-page demo handout (PDF/Markdown) summarizing hardware, how to demo, and talking points. Tell me whether you want a concise handout or keep the README as-is and I will produce the handout next.
 
----
-Progress: created README draft and updated the todo list (created). Next: I can produce the one-page demo handout if you want, or push the README into the repo (already created). Which would you like next?
+
+DATE:18-12-2025
+
+made an mobile app and added few more changes to project like switching from html to reactjs and few more frontend and backend changes #unpolished version
