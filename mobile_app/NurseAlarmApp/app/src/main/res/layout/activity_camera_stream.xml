@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/colorPrimaryDark">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:background="@color/colorPrimaryDark">
+
+        <Button
+            android:id="@+id/btnBackFromCamera"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← Back"
+            android:backgroundTint="@color/darkGray"
+            android:textColor="@color/champagne" />
+
+        <TextView
+            android:id="@+id/tvCameraTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Live Camera Feed"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/gold"
+            android:gravity="center"
+            android:layout_marginStart="8dp" />
+
+    </LinearLayout>
+
+    <!-- Status Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:background="@color/darkGray"
+        android:gravity="center">
+
+        <ProgressBar
+            android:id="@+id/progressBarCamera"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginEnd="8dp"
+            android:indeterminateTint="@color/gold" />
+
+        <TextView
+            android:id="@+id/tvCameraStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Connecting..."
+            android:textSize="14sp"
+            android:textColor="@color/champagne" />
+
+    </LinearLayout>
+
+    <!-- Camera Stream - native ImageView for reliable JPEG display -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#000000">
+
+        <ImageView
+            android:id="@+id/imageViewCamera"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter"
+            android:contentDescription="Live camera feed" />
+
+        <!-- Placeholder when no stream -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📹"
+                android:textSize="64sp"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Camera Stream Unavailable"
+                android:textSize="18sp"
+                android:textColor="@color/champagne"
+                android:textAlignment="center"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ensure backend is running and\ncamera endpoint is accessible"
+                android:textSize="14sp"
+                android:textColor="@color/gold"
+                android:textAlignment="center" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+    <!-- Instructions -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp"
+        android:text="Streaming laptop webcam feed"
+        android:textSize="12sp"
+        android:textColor="@color/champagne"
+        android:gravity="center"
+        android:background="@color/darkGray" />
+
+</LinearLayout>

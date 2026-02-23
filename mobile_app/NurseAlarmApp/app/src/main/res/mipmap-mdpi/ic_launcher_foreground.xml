@@ -1,0 +1,142 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    
+    <!-- Rounded square background (light blue) -->
+    <path
+        android:fillColor="#D1E9F6"
+        android:pathData="M30,15 L170,15 Q185,15 185,30 L185,170 Q185,185 170,185 L30,185 Q15,185 15,170 L15,30 Q15,15 30,15 Z"/>
+    
+    <!-- SMARTWATCH (Left side) -->
+    <!-- Watch band left -->
+    <path
+        android:fillColor="#2D6A6A"
+        android:pathData="M35,85 L50,85 L50,115 L35,115 Z"/>
+    
+    <!-- Watch case -->
+    <path
+        android:fillColor="#1E4D4D"
+        android:pathData="M50,80 L75,80 L75,120 L50,120 Z"/>
+    
+    <!-- Watch screen (dark background) -->
+    <path
+        android:fillColor="#0F3333"
+        android:pathData="M52,85 L73,85 L73,115 L52,115 Z"/>
+    
+    <!-- Heart icon on watch (green) -->
+    <path
+        android:fillColor="#4ADE80"
+        android:pathData="M57,95 L59,95 Q60,94 61,95 L63,95 Q64,94 65,95 L65,97 Q64,99 62.5,101 L61,103 L59.5,101 Q58,99 57,97 L57,95 Z"/>
+    
+    <!-- "98" text on watch (white) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M57,106 L58,106 L58,110 L57,110 Z M59,106 Q60,106 60,107 L60,109 Q60,110 59,110 L58.5,110 L58.5,109 L59,109 Q59.5,109 59.5,108.5 L59.5,107.5 Q59.5,107 59,107 L58.5,107 L58.5,106 Z"/>
+    
+    <!-- "BPM" text (small, white) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M61,108 L61.5,108 L61.5,110 L61,110 Z M62,108 L62.5,108 Q63,108 63,108.5 L63,109.5 Q63,110 62.5,110 L62,110 L62,108 Z M64,108 L64.5,108 L64.5,110 L64,110 Z M65,108 L65.5,108 L65.5,110 L65,110 Z"/>
+    
+    <!-- Watch band right -->
+    <path
+        android:fillColor="#2D6A6A"
+        android:pathData="M75,85 L90,85 L90,115 L75,115 Z"/>
+    
+    <!-- MOBILE PHONE (Right side) -->
+    <!-- Phone outer case (teal) -->
+    <path
+        android:fillColor="#5A9C9C"
+        android:pathData="M115,60 L155,60 Q160,60 160,65 L160,135 Q160,140 155,140 L115,140 Q110,140 110,135 L110,65 Q110,60 115,60 Z"/>
+    
+    <!-- Phone screen (light cyan) -->
+    <path
+        android:fillColor="#B8E6E6"
+        android:pathData="M117,65 L153,65 Q156,65 156,68 L156,132 Q156,135 153,135 L117,135 Q114,135 114,132 L114,68 Q114,65 117,65 Z"/>
+    
+    <!-- Person head on screen (dark blue-gray) -->
+    <path
+        android:fillColor="#4A5F7F"
+        android:pathData="M135,75 m-8,0 a8,8 0,1,1 16,0 a8,8 0,1,1 -16,0"/>
+    
+    <!-- Person body on screen -->
+    <path
+        android:fillColor="#4A5F7F"
+        android:pathData="M135,84 C128,84 123,89 123,96 L123,100 L147,100 L147,96 C147,89 142,84 135,84 Z"/>
+    
+    <!-- Smartwatch icon on person's wrist (on phone screen) -->
+    <path
+        android:fillColor="#2D6A6A"
+        android:pathData="M127,105 L133,105 L133,112 L127,112 Z"/>
+    
+    <!-- WiFi signal icon on phone -->
+    <path
+        android:fillColor="#4ADE80"
+        android:pathData="M135,115 m-3,0 a3,3 0,1,1 6,0 a3,3 0,1,1 -6,0"/>
+    
+    <!-- WIRELESS SIGNALS (Between watch and phone) -->
+    <!-- Wave 1 (cyan) -->
+    <path
+        android:strokeColor="#7DD3FC"
+        android:strokeWidth="3"
+        android:fillColor="#00000000"
+        android:pathData="M85,75 Q95,70 105,75"/>
+    
+    <!-- Wave 2 (light blue) -->
+    <path
+        android:strokeColor="#7DD3FC"
+        android:strokeWidth="3"
+        android:fillColor="#00000000"
+        android:pathData="M85,88 Q95,83 105,88"/>
+    
+    <!-- Wave 3 (cyan) -->
+    <path
+        android:strokeColor="#7DD3FC"
+        android:strokeWidth="3"
+        android:fillColor="#00000000"
+        android:pathData="M85,101 Q95,96 105,101"/>
+    
+    <!-- DECORATIVE DOTS (Top left area) -->
+    <!-- Dot cluster forming a pattern -->
+    <path
+        android:fillColor="#7DD3FC"
+        android:pathData="M75,45 m-2,0 a2,2 0,1,1 4,0 a2,2 0,1,1 -4,0"/>
+    <path
+        android:fillColor="#7DD3FC"
+        android:pathData="M83,40 m-2,0 a2,2 0,1,1 4,0 a2,2 0,1,1 -4,0"/>
+    <path
+        android:fillColor="#7DD3FC"
+        android:pathData="M91,38 m-2,0 a2,2 0,1,1 4,0 a2,2 0,1,1 -4,0"/>
+    <path
+        android:fillColor="#7DD3FC"
+        android:pathData="M99,40 m-2,0 a2,2 0,1,1 4,0 a2,2 0,1,1 -4,0"/>
+    <path
+        android:fillColor="#7DD3FC"
+        android:pathData="M75,53 m-2,0 a2,2 0,1,1 4,0 a2,2 0,1,1 -4,0"/>
+    <path
+        android:fillColor="#7DD3FC"
+        android:pathData="M83,51 m-2,0 a2,2 0,1,1 4,0 a2,2 0,1,1 -4,0"/>
+    <path
+        android:fillColor="#7DD3FC"
+        android:pathData="M91,50 m-2,0 a2,2 0,1,1 4,0 a2,2 0,1,1 -4,0"/>
+    
+    <!-- Curved arc lines (decorative) -->
+    <path
+        android:strokeColor="#7DD3FC"
+        android:strokeWidth="2.5"
+        android:fillColor="#00000000"
+        android:pathData="M70,55 Q80,50 90,55"/>
+    <path
+        android:strokeColor="#5AC8FA"
+        android:strokeWidth="2.5"
+        android:fillColor="#00000000"
+        android:pathData="M75,62 Q85,57 95,62"/>
+    <path
+        android:strokeColor="#7DD3FC"
+        android:strokeWidth="2"
+        android:fillColor="#00000000"
+        android:pathData="M80,68 Q90,65 100,68"/>
+    
+</vector>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F5F5"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔵 General Ward - Nurse Mode"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#4CAF50"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Status: Connecting..."
+            android:textSize="16sp"
+            android:textColor="#666666"
+            android:layout_marginBottom="16dp"/>
+
+        <Switch
+            android:id="@+id/switchSimulateBand"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Simulate Band Detection (No Hardware)"
+            android:checked="true"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btnToggleScanning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Start Scanning"
+            android:textSize="16sp"
+            android:backgroundTint="#4CAF50"
+            android:layout_marginBottom="8dp"/>
+
+        <!-- NEW TEST BUTTON -->
+        <Button
+            android:id="@+id/btnTestVibration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Test Vibration"
+            android:backgroundTint="#FF9800"
+            android:layout_marginBottom="24dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📡 Proximity Detection"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/tvNearbyDevices"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Nearby Patients:\nNo devices detected"
+            android:textSize="14sp"
+            android:background="#FFFFFF"
+            android:padding="12dp"
+            android:minHeight="100dp"
+            android:layout_marginBottom="24dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📱 Live Debug Log &amp; Alerts"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#333333"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/tvRecentAlerts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Waiting for events..."
+            android:textSize="14sp"
+            android:background="#FFFFFF"
+            android:padding="12dp"
+            android:minHeight="200dp"
+            android:fontFamily="monospace"/>
+
+    </LinearLayout>
+
+</ScrollView>

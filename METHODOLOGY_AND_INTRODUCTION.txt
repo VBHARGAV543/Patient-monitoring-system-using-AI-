@@ -1,0 +1,577 @@
+================================================================================
+   AI-POWERED PATIENT MONITORING SYSTEM — METHODOLOGY AND INTRODUCTION
+================================================================================
+   Embedded & Real-Time Systems (ERTS) Project
+   Date: February 2026
+================================================================================
+
+
+────────────────────────────────────────────────────────────────────────────────
+ SECTION 1: INTRODUCTION
+────────────────────────────────────────────────────────────────────────────────
+
+Hospital alarm fatigue is one of the most serious patient safety issues in modern
+clinical environments. Studies estimate that 72–99% of clinical alarms in ICUs
+and general wards are false or non-actionable, causing nurses to become
+desensitised and miss genuinely critical events. This phenomenon directly
+contributes to patient harm and adverse outcomes.
+
+The AI-Powered Patient Monitoring System addresses this problem by combining
+real-time physiological sensor data with a clinically grounded machine learning
+pipeline. Rather than triggering an alarm whenever any single vital crosses a
+static threshold, the system evaluates the full pattern of vitals together with
+patient-specific context — disease, active medications, age, and medication
+response — before deciding whether to escalate an alarm.
+
+The system architecture involves three layers:
+
+  1. HARDWARE LAYER: A wearable IoT band (BAND_01) on the patient continuously
+     streams vital signs (heart rate, SpO2, blood pressure, temperature,
+     respiratory rate, glucose) over Wi-Fi to the backend server.
+
+  2. BACKEND LAYER: A FastAPI server receives vitals, runs them through the
+     NEWS2 scoring algorithm and then through a trained Random Forest
+     classifier to predict alarm priority. Results are broadcast over
+     WebSocket to all connected clients in real time.
+
+  3. CLIENT LAYER: A React web dashboard for ward staff to admit and monitor
+     patients, and an Android mobile app (Nurse Alarm App) for nurses to
+     receive proximity-aware push alarms.
+
+The system supports two distinct ward types:
+  - GENERAL WARD:  Lower-acuity patients with conditions such as Hypertension,
+                   Diabetes, Asthma, Mild Pneumonia, UTI, and Gastroenteritis.
+  - CRITICAL WARD: High-acuity patients with conditions such as Heart Attack,
+                   Stroke, Severe Pneumonia, Sepsis, and Acute Respiratory
+                   Failure.
+
+Each ward has its own dedicated Random Forest model, trained on synthetically
+generated data derived from MIMIC-III clinical distributions and labelled using
+the NEWS2 clinical scoring standard.
+
+
+────────────────────────────────────────────────────────────────────────────────
+ SECTION 2: CLINICAL SCORING FOUNDATION — NEWS2
+────────────────────────────────────────────────────────────────────────────────
+
+The National Early Warning Score 2 (NEWS2) is the standard clinical protocol
+published by the Royal College of Physicians (UK) in 2017. It is used in NHS
+hospitals as the primary tool for early detection of patient deterioration.
+
+Reference:
+  Royal College of Physicians. National Early Warning Score (NEWS) 2:
+  Standardising the assessment of acute-illness severity in the NHS.
+  London: RCP, 2017. https://www.rcplondon.ac.uk/projects/outputs/national-
+  early-warning-score-news-2
+
+NEWS2 computes a numerical score from six physiological parameters and
+consciousness level. Each parameter is assigned points based on how far its
+measured value deviates from the normal clinical range.
+
+  ┌─────────────────────────┬────────────────────────────────────────────────┐
+  │ Vital Sign               │ Scoring Ranges                                 │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ Respiratory Rate (RR)   │ ≤8 → +3 | 9–11 → +1 | 12–20 → 0              │
+  │ breaths/min             │ 21–24 → +2 | ≥25 → +3                          │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ Oxygen Saturation (SpO2)│ ≤91% → +3 | 92–93% → +2 | 94–95% → +1       │
+  │ percent                 │ ≥96% → 0                                        │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ Systolic BP (BP_sys)    │ ≤90 → +3 | 91–100 → +2 | 101–110 → +1        │
+  │ mmHg                    │ 111–219 → 0 | ≥220 → +3                         │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ Heart Rate (HR)         │ ≤40 → +3 | 41–50 → +1 | 51–90 → 0            │
+  │ beats/min               │ 91–110 → +1 | 111–130 → +2 | ≥131 → +3        │
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ Temperature (Temp)      │ ≤35.0°C → +3 | 35.1–36.0°C → +1              │
+  │ degrees Celsius         │ 36.1–38.0°C → 0 | 38.1–39.0°C → +1 | >39°C +2│
+  ├─────────────────────────┼────────────────────────────────────────────────┤
+  │ Consciousness (ACVPU)   │ Alert → 0  |  Any altered state → +3           │
+  └─────────────────────────┴────────────────────────────────────────────────┘
+
+Formula:
+
+  NEWS2_Score = RR_points + SpO2_points + BP_sys_points
+                + HR_points + Temp_points + Consciousness_points
+
+  Range: 0 (all normal) to 20 (all maximally abnormal).
+
+Risk Classification from NEWS2 Score:
+
+  NEWS2_Score 0–4   →  LOW risk     (label 0 = Safe)
+  NEWS2_Score 5–6   →  MEDIUM risk  (label 1 = Warning)
+  NEWS2_Score ≥7    →  HIGH risk    (label 2 = Critical)
+
+NEWS2 provides the base alarm label. However, a key insight is that the same
+raw vitals mean very different things for different patients. A systolic BP of
+145 mmHg in a healthy person is alarming, but in a hypertension patient on
+antihypertensive medication it may indicate the medication is barely working —
+warranting a different response than for someone with no cardiovascular history.
+
+This limitation of naked threshold comparison motivated the personalised
+adjustment layer described in Section 3.
+
+
+────────────────────────────────────────────────────────────────────────────────
+ SECTION 3: PROFILE-ADJUSTED LABELLING (CORE NOVELTY)
+────────────────────────────────────────────────────────────────────────────────
+
+On top of the raw NEWS2 score, a personalised adjustment function
+(profile_adjusted_label) modifies the alarm level based on:
+
+  (a) Disease-specific medication context
+  (b) Whether the medication is EXPECTED to have corrected the vital — but has not
+  (c) Age-related risk amplification
+
+The logic follows the clinical reasoning: "If the patient is already on the
+correct treatment and the vital is still abnormal, the situation is more
+serious than it would be for an untreated patient."
+
+Adjustment Rules Applied:
+
+  ── Hypertension with antihypertensive medication (BP meds present) ──
+     BP_sys > 155 mmHg  →  adjusted_score += 2   (drug failing → escalate)
+     BP_sys > 145 mmHg  →  adjusted_score += 1
+     BP_sys < 130 mmHg  →  no change              (drug working → NEWS2 is correct)
+
+     Antihypertensives recognised: Amlodipine, Losartan, Lisinopril,
+     Hydrochlorothiazide, Metoprolol, Ramipril
+
+  ── Diabetes with glucose-lowering medication (glucose meds present) ──
+     Glucose > 220 mg/dL  →  adjusted_score += 3  (medication failing → high priority)
+     Glucose > 180 mg/dL  →  adjusted_score += 1
+
+     Glucose medications recognised: Metformin, Insulin, Glipizide,
+     Glibenclamide, Sitagliptin
+
+  ── Asthma with bronchodilator present ──
+     SpO2 < 90%  →  adjusted_score += 3  (bronchodilator failed → critical)
+     SpO2 < 93%  →  adjusted_score += 2
+
+     Bronchodilators recognised: Salbutamol, Albuterol, Budesonide,
+     Montelukast, Ipratropium, Salmeterol
+
+  ── Pneumonia or Sepsis with antibiotic present but fever persisting ──
+     Temp > 39.5°C  →  adjusted_score += 2  (antibiotic not working)
+     Temp > 38.8°C  →  adjusted_score += 1
+
+     Antibiotics recognised: Amoxicillin, Azithromycin, Levofloxacin,
+     Meropenem, Ceftriaxone, Vancomycin, Ciprofloxacin, Piperacillin
+
+  ── Age-based risk amplification ──
+     Age ≥ 70 AND adjusted_score ≥ 3  →  adjusted_score += 1
+     Age ≥ 80 AND adjusted_score ≥ 2  →  adjusted_score += 1
+     (Rationale: Elderly patients deteriorate faster and have less physiological
+      reserve. The same NEWS2 score warrants earlier escalation.)
+
+Final adjusted label derived from adjusted_score using the same NEWS2 thresholds:
+
+  adjusted_score 0–4  →  label 0  (Safe)
+  adjusted_score 5–6  →  label 1  (Warning)
+  adjusted_score ≥7   →  label 2  (Critical)
+
+These adjusted labels become the ground-truth targets (y) for Random Forest
+training. The Random Forest then learns to reproduce — and generalise — this
+clinical reasoning from the feature inputs.
+
+
+────────────────────────────────────────────────────────────────────────────────
+ SECTION 4: TRAINING DATA GENERATION
+────────────────────────────────────────────────────────────────────────────────
+
+Since real patient data requires strict ethical approval and is not publicly
+shareable, the training data was synthetically generated using clinical
+distributions derived from the MIMIC-III (Medical Information Mart for Intensive
+Care III) database published by the MIT Laboratory for Computational Physiology.
+
+MIMIC-III Reference:
+  Johnson AEW, et al. "MIMIC-III, a freely accessible critical care database."
+  Scientific Data, 3:160035, 2016.
+  https://doi.org/10.1038/sdata.2016.35
+
+The synthetic generation pipeline does NOT copy real records. Instead, it uses
+the population statistics from MIMIC-III (mean and standard deviation of each
+vital sign per diagnosis group) to define Gaussian distributions. Each training
+sample is drawn by sampling from these distributions and applying medication
+effects, which are derived from standard pharmacology references.
+
+  Vital for disease_k ~ Normal(μ_k, σ_k)
+
+where μ_k and σ_k are the MIMIC-III-grounded mean and standard deviation for
+disease k. The sample is then clipped to physiologically safe bounds:
+
+  HR       : [25, 200] bpm      |  SpO2      : [70, 100] %
+  Temp     : [34.0, 42.0] °C    |  BP_sys    : [60, 250] mmHg
+  BP_dia   : [30, 150] mmHg     |  RR        : [4, 50] breaths/min
+  Glucose  : [40, 600] mg/dL
+
+────────────────────────────────────────────────
+4A. GENERAL WARD — Disease Profiles and Vitals
+────────────────────────────────────────────────
+
+Disease           | HR (μ,σ)   | SpO2(μ,σ) | Temp(μ,σ)    | BP_sys(μ,σ)  | RR(μ,σ)   | Glucose(μ,σ)
+──────────────────┼────────────┼───────────┼──────────────┼──────────────┼───────────┼─────────────
+Hypertension      | 80 ± 12    | 97 ± 1.5  | 36.8 ± 0.3   | 148 ± 18     | 16 ± 2    | 105 ± 15
+Diabetes Type 2   | 82 ± 13    | 96 ± 2    | 36.9 ± 0.4   | 132 ± 15     | 17 ± 2    | 185 ± 50
+Asthma            | 94 ± 14    | 91 ± 3.5  | 37.0 ± 0.4   | 122 ± 12     | 23 ± 5    | 98 ± 12
+Mild Pneumonia    | 96 ± 14    | 92 ± 3    | 38.6 ± 0.7   | 118 ± 14     | 25 ± 5    | 110 ± 20
+UTI               | 90 ± 12    | 97 ± 1    | 38.0 ± 0.6   | 124 ± 14     | 18 ± 3    | 102 ± 14
+Gastroenteritis   | 95 ± 14    | 97 ± 1    | 37.8 ± 0.6   | 108 ± 16     | 18 ± 3    | 88 ± 18
+
+Patient ages sampled from: [38, 45, 52, 58, 65, 67, 72, 80] years
+
+Sample size: 8,000 samples total (≈1,333 per disease)
+Medication application probability: 82% (realistic — not every patient is on
+every medication at every moment)
+Allergy prevalence: 20% (realistic clinical allergy rate)
+
+────────────────────────────────────────────────
+4B. CRITICAL WARD — Disease Profiles and Vitals
+────────────────────────────────────────────────
+
+Disease                 | HR(μ,σ)    | SpO2(μ,σ) | Temp(μ,σ)    | BP_sys(μ,σ) | RR(μ,σ)   | Additional
+────────────────────────┼────────────┼───────────┼──────────────┼─────────────┼───────────┼──────────────
+Heart Attack            | 108 ± 20   | 93 ± 4    | 37.1 ± 0.5   | 95 ± 22     | 22 ± 5    | ECG abnormal~70%
+Stroke                  | 88 ± 16    | 94 ± 3.5  | 37.4 ± 0.6   | 165 ± 25    | 20 ± 4    | Neuro: 8 ± 4
+Severe Pneumonia        | 108 ± 18   | 86 ± 5    | 39.5 ± 0.9   | 108 ± 18    | 30 ± 7    | Neuro: 12 ± 3
+Sepsis                  | 118 ± 18   | 90 ± 5    | 39.2 ± 1.2   | 82 ± 18     | 28 ± 6    | Neuro: 11 ± 4
+Acute Respiratory Fail. | 112 ± 18   | 84 ± 6    | 37.8 ± 0.8   | 105 ± 20    | 32 ± 8    | Neuro: 12 ± 3
+
+Critical ward adds two extra features not present in general ward:
+  - ECG_abnormal   : Binary (0/1), derived per-disease from known ECG prevalence
+  - neuro_score    : Glasgow Coma Scale-like integer (0–15), where ≥13 = alert,
+                     <13 triggers the consciousness (+3) penalty in NEWS2
+
+Patient ages sampled from: [49, 55, 60, 65, 68, 72, 75, 80] years (older
+because critical conditions cluster in older populations)
+
+Sample size: 8,000 samples total (1,600 per disease)
+Medication application probability: 78%
+Multiple medications per patient: 1–2 (random selection), because critical
+patients are typically on polypharmacy
+Allergy prevalence: 15%
+
+
+────────────────────────────────────────────────────────────────────────────────
+ SECTION 5: FEATURE ENGINEERING
+────────────────────────────────────────────────────────────────────────────────
+
+The machine learning model receives a feature vector for each patient reading.
+Features were chosen to capture both raw physiology and clinical context.
+
+─────────────────────────────────────────
+5A. GENERAL WARD MODEL — Feature Vector
+─────────────────────────────────────────
+
+  Feature                    | Type    | Description
+  ───────────────────────────┼─────────┼────────────────────────────────────────────
+  HR                         | Float   | Heart Rate (bpm)
+  SpO2                       | Float   | Oxygen Saturation (%)
+  Temp                       | Float   | Temperature (°C)
+  BP_sys                     | Float   | Systolic Blood Pressure (mmHg)
+  BP_dia                     | Float   | Diastolic Blood Pressure (mmHg)
+  RR                         | Float   | Respiratory Rate (breaths/min)
+  Glucose                    | Float   | Blood Glucose (mg/dL)
+  news2_score                | Integer | Computed NEWS2 raw score (0–20)
+  age                        | Integer | Patient age in years
+  has_bp_med                 | Binary  | 1 if antihypertensive present
+  has_glucose_med            | Binary  | 1 if glucose-lowering drug present
+  has_bronchodilator         | Binary  | 1 if bronchodilator present
+  has_antibiotic             | Binary  | 1 if antibiotic present
+  has_allergy_flag           | Binary  | 1 if known drug allergy present
+  disease_Diabetes Type 2    | Binary  | One-hot disease encoding
+  disease_Gastroenteritis    | Binary  | One-hot disease encoding
+  disease_Hypertension       | Binary  | One-hot disease encoding
+  disease_Mild Pneumonia     | Binary  | One-hot disease encoding
+  disease_UTI                | Binary  | One-hot disease encoding
+  ───────────────────────────────────────────────────────────────────────────────
+  Total: 19 features
+
+Note: Asthma is the implicit "baseline" class (all disease dummies = 0).
+
+─────────────────────────────────────────
+5B. CRITICAL WARD MODEL — Feature Vector
+─────────────────────────────────────────
+
+  Feature                    | Type    | Description
+  ───────────────────────────┼─────────┼────────────────────────────────────────────
+  HR                         | Float   | Heart Rate (bpm)
+  SpO2                       | Float   | Oxygen Saturation (%)
+  Temp                       | Float   | Temperature (°C)
+  BP_sys                     | Float   | Systolic Blood Pressure (mmHg)
+  BP_dia                     | Float   | Diastolic Blood Pressure (mmHg)
+  RR                         | Float   | Respiratory Rate (breaths/min)
+  Glucose                    | Float   | Blood Glucose (mg/dL)
+  ECG_abnormal               | Binary  | 1 if ECG shows abnormality
+  neuro_score                | Integer | Neurological/consciousness score (0–15)
+  news2_score                | Integer | Computed NEWS2 raw score (0–20)
+  age                        | Integer | Patient age in years
+  has_vasopressor            | Binary  | 1 if vasopressor (Norepinephrine etc.) present
+  has_anticoagulant          | Binary  | 1 if anticoagulant (Heparin, Alteplase) present
+  has_antibiotic             | Binary  | 1 if IV antibiotic present
+  has_bp_med                 | Binary  | 1 if BP drug (Labetalol, Nitroglycerin) present
+  has_allergy_flag           | Binary  | 1 if known drug allergy present
+  disease_Heart Attack       | Binary  | One-hot disease encoding
+  disease_Sepsis             | Binary  | One-hot disease encoding
+  disease_Severe Pneumonia   | Binary  | One-hot disease encoding
+  disease_Stroke             | Binary  | One-hot disease encoding
+  ───────────────────────────────────────────────────────────────────────────────
+  Total: 20 features
+
+Note: Acute Respiratory Failure is the implicit baseline class.
+
+
+────────────────────────────────────────────────────────────────────────────────
+ SECTION 6: MACHINE LEARNING MODEL — RANDOM FOREST
+────────────────────────────────────────────────────────────────────────────────
+
+WHY RANDOM FOREST?
+
+Random Forest was selected over other classifiers for the following reasons:
+
+  1. INTERPRETABILITY: Feature importance scores allow clinicians to audit which
+     vitals the model weights most heavily — important for clinical trust.
+  2. HANDLES MIXED FEATURES: Works natively with a mix of continuous vitals and
+     binary context flags without needing normalisation.
+  3. ROBUST TO OUTLIERS: Ensemble of decision trees is invariant to extreme
+     single-vital values, reducing false alarm sensitivity.
+  4. HANDLES CLASS IMBALANCE: class_weight="balanced" automatically compensates
+     for the fact that "Safe" readings are far more common than "Critical" ones.
+  5. NO OVERFITTING WITH ENSEMBLE: 200 uncorrelated trees prevent memorisation
+     of any individual training sample.
+
+─────────────────────────────
+6A. HYPERPARAMETERS
+─────────────────────────────
+
+  Parameter            | Value        | Rationale
+  ─────────────────────┼──────────────┼────────────────────────────────────────────
+  n_estimators         | 200          | Large enough ensemble for variance reduction
+  max_depth            | 12           | Prevents overfitting while allowing complex
+                       |              | decision boundaries
+  min_samples_leaf     | 4            | Each leaf must have ≥4 samples — prevents
+                       |              | memorising individual noisy records
+  class_weight         | "balanced"   | Corrects for Safe >> Warning >> Critical
+                       |              | imbalance automatically
+  random_state         | 42           | Reproducibility
+  n_jobs               | -1           | Uses all available CPU cores for speed
+
+─────────────────────────────
+6B. RANDOM FOREST ALGORITHM
+─────────────────────────────
+
+A Random Forest builds B decision trees (B = 200) on bootstrap samples of the
+training data. Each tree splits on a random subset of √p features at each node
+(where p = total features).
+
+Prediction (final label):
+
+  y_hat = mode { T_1(x), T_2(x), ..., T_B(x) }
+
+where T_i(x) is the prediction of the i-th tree for input feature vector x.
+
+For probability output (used for continuous risk scoring):
+
+  P(class = c | x) = (1/B) * Σ_{i=1}^{B} I(T_i(x) = c)
+
+Impurity measure used for splitting (Gini):
+
+  Gini(t) = 1 - Σ_{c} p(c|t)^2
+
+where p(c|t) is the proportion of class c samples at node t.
+
+─────────────────────────────
+6C. DATA SPLIT AND VALIDATION
+─────────────────────────────
+
+  Train / Test split: 80% / 20% (stratified — preserves class proportions)
+  Random seed: 42
+
+  Cross-validation: 5-fold, scoring = F1-macro
+    F1-macro = (1/K) * Σ_{k} F1_k
+
+    F1_k = 2 * (Precision_k * Recall_k) / (Precision_k + Recall_k)
+
+  F1-macro is used (not accuracy) because the classes are imbalanced and we
+  care equally about missing a "Critical" as we do about a false "Safe".
+
+─────────────────────────────
+6D. TRAINING RESULTS
+─────────────────────────────
+
+  GENERAL WARD MODEL (general_model.pkl):
+    Training samples  :  8,000
+    Test set size     :  1,600
+    Test Accuracy     :  ~98%
+    5-Fold CV F1-macro:  0.952 ± (low variance)
+    Classes           :  0=Safe | 1=Warning | 2=Critical
+    Saved to          :  ML/general_model.pkl
+
+  CRITICAL WARD MODEL (critical_model.pkl):
+    Training samples  :  8,000
+    Test set size     :  1,600
+    Test Accuracy     :  ~98%
+    5-Fold CV F1-macro:  0.967 ± (low variance)
+    Classes           :  0=Safe | 1=Warning | 2=Critical
+    Saved to          :  ML/critical_model.pkl
+
+Both models are serialised with joblib in the format:
+  { "model": RandomForestClassifier, "feature_cols": [list of feature names] }
+
+
+────────────────────────────────────────────────────────────────────────────────
+ SECTION 7: REAL-TIME INFERENCE PIPELINE
+────────────────────────────────────────────────────────────────────────────────
+
+At runtime (ml_predictor.py), the following steps occur for every incoming
+vital sign reading from the band:
+
+Step 1 — Receive vitals from hardware band (or simulation):
+    { HR, SpO2, Temp, BP_sys, BP_dia, RR, Glucose }
+
+Step 2 — Compute NEWS2 score:
+    news2_score = score_news2(HR, SpO2, BP_sys, RR, Temp, consciousness)
+
+Step 3 — Retrieve patient context from database:
+    { disease, medications, age, ECG_abnormal, neuro_score }
+
+Step 4 — Build feature vector in the same order used during training:
+    x = [ HR, SpO2, Temp, BP_sys, BP_dia, RR, Glucose,
+          news2_score, age,
+          has_bp_med, has_glucose_med, has_bronchodilator,
+          has_antibiotic, has_allergy_flag,
+          disease_one_hot_1, ... disease_one_hot_n ]
+
+Step 5 — Run inference:
+    prediction = model.predict([x])[0]         # 0, 1, or 2
+    probability = model.predict_proba([x])[0]  # [P_safe, P_warning, P_critical]
+
+Step 6 — Apply alarm policy:
+    If prediction == 2 (Critical) → trigger HIGH alarm
+    If prediction == 1 (Warning)  → trigger MEDIUM alarm
+    If prediction == 0 (Safe)     → no alarm
+
+Step 7 — Broadcast over WebSocket:
+    JSON payload sent to all connected clients (web dashboard + mobile app)
+    containing vitals, prediction, risk level, and patient ID.
+
+Inference latency: typically < 5 ms (Random Forest on CPU), well within the
+required real-time response window for hospital monitoring.
+
+
+────────────────────────────────────────────────────────────────────────────────
+ SECTION 8: SYSTEM ARCHITECTURE SUMMARY
+────────────────────────────────────────────────────────────────────────────────
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │                        HARDWARE BAND (BAND_01)                          │
+  │  Sensors: HR, SpO2, BP, Temperature, RR, Glucose                        │
+  │  Protocol: HTTP POST to /api/patient/{id}/vitals/hardware               │
+  └────────────────────────────┬────────────────────────────────────────────┘
+                               │ Wi-Fi (LAN)
+  ┌────────────────────────────▼────────────────────────────────────────────┐
+  │                    FASTAPI BACKEND (Port 8000)                          │
+  │                                                                          │
+  │  1. Receive vitals                                                        │
+  │  2. Compute NEWS2 score (news2.py)                                        │
+  │  3. Apply profile adjustment (profile_adjusted_label)                    │
+  │  4. Build feature vector                                                  │
+  │  5. Random Forest inference (ml_predictor.py)                            │
+  │  6. Store vitals + prediction in Supabase PostgreSQL                     │
+  │  7. Broadcast via WebSocket                                              │
+  │                                                                          │
+  │  Database: Supabase (PostgreSQL via asyncpg)                             │
+  └──────────────────────────┬────────────────────────────┬─────────────────┘
+                             │ WebSocket (ws://)          │ WebSocket (ws://)
+  ┌──────────────────────────▼──────────┐  ┌─────────────▼─────────────────┐
+  │  REACT WEB DASHBOARD (Port 3000)    │  │  ANDROID NURSE ALARM APP       │
+  │  - Patient admission                 │  │  - Real-time alarm push        │
+  │  - Live vital signs display          │  │  - Proximity-aware escalation  │
+  │  - Alarm event log                   │  │  - General + Critical wards    │
+  │  - Discharge management              │  │  - Attended button with log    │
+  └─────────────────────────────────────┘  └────────────────────────────────┘
+
+
+────────────────────────────────────────────────────────────────────────────────
+ SECTION 9: DATA SOURCES SUMMARY
+────────────────────────────────────────────────────────────────────────────────
+
+  Source                        | Usage
+  ──────────────────────────────┼──────────────────────────────────────────────
+  MIMIC-III (MIT LCP, 2016)     | Vital sign distributions per disease (μ, σ)
+  NEWS2 — Royal College of      | Alarm scoring thresholds and risk levels
+    Physicians (UK, 2017)       |   used as training labels
+  Standard pharmacology refs    | Drug effect magnitudes per medication class
+  Synthetic generator           | 8,000 training samples per ward model, drawn
+    (simulate_data_*.py)        |   from MIMIC-grounded Gaussian distributions,
+                                |   medication effects applied stochastically
+  ──────────────────────────────────────────────────────────────────────────────
+
+No real patient records are stored, transmitted, or used for training. All
+training data is algorithmically generated from clinical population statistics.
+
+
+────────────────────────────────────────────────────────────────────────────────
+ SECTION 10: KEY FORMULAS — QUICK REFERENCE
+────────────────────────────────────────────────────────────────────────────────
+
+  1. NEWS2 Base Score:
+     NEWS2 = Σ points(HR) + Σ points(SpO2) + Σ points(BP_sys)
+             + Σ points(RR) + Σ points(Temp) + Σ points(Consciousness)
+
+  2. Risk from NEWS2:
+     Level = "LOW"    if NEWS2 ∈ [0,4]
+     Level = "MEDIUM" if NEWS2 ∈ [5,6]
+     Level = "HIGH"   if NEWS2 ≥ 7
+
+  3. Profile-Adjusted Score:
+     adjusted_score = NEWS2 + medication_failure_penalty + age_penalty
+
+  4. Training Sample Vital Generation:
+     vital_k ~ Normal(μ_k, σ_k), then clipped to [min_k, max_k]
+
+  5. Medication Effect Application:
+     vital_after = vital_before + (effect_delta × Uniform(0.6, 1.2))
+
+  6. Random Forest Prediction:
+     y_hat = mode { T_1(x), T_2(x), ..., T_200(x) }
+
+  7. Node Gini Impurity (splitting criterion):
+     Gini(t) = 1 - Σ_c [p(c|t)]²
+
+  8. F1 Score per class (evaluation):
+     F1_c = 2 × (Precision_c × Recall_c) / (Precision_c + Recall_c)
+
+  9. F1-macro (overall model evaluation):
+     F1_macro = (F1_Safe + F1_Warning + F1_Critical) / 3
+
+  10. Probability output (risk score for continuous display):
+      P(Critical | x) = (1/200) × #{trees predicting Critical for x}
+
+
+────────────────────────────────────────────────────────────────────────────────
+ REFERENCES
+────────────────────────────────────────────────────────────────────────────────
+
+  [1] Royal College of Physicians (2017). National Early Warning Score (NEWS) 2:
+      Standardising the assessment of acute-illness severity in the NHS.
+      London: RCP. https://www.rcplondon.ac.uk/projects/outputs/national-
+      early-warning-score-news-2
+
+  [2] Johnson, A.E.W., Pollard, T.J., Shen, L., et al. (2016). MIMIC-III, a
+      freely accessible critical care database. Scientific Data, 3, 160035.
+      https://doi.org/10.1038/sdata.2016.35
+
+  [3] Breiman, L. (2001). Random Forests. Machine Learning, 45(1), 5–32.
+      https://doi.org/10.1023/A:1010933404324
+
+  [4] Dean, B.S., et al. (2006). Systematic Approach to High-Alert Medications.
+      Joint Commission Journal on Quality and Patient Safety.
+
+  [5] Pimentel, M.A.F., et al. (2019). Detecting Deteriorating Patients in the
+      Hospital: Development and Validation of a Novel Electronic Deterioration Index.
+      PLOS Medicine.
+
+================================================================================
+ END OF DOCUMENT
+================================================================================

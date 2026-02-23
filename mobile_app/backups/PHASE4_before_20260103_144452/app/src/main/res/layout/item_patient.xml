@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cardPatient"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="4dp"
+    app:cardBackgroundColor="@color/marble"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="2dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp">
+
+        <!-- Name Column -->
+        <TextView
+            android:id="@+id/tvPatientName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:text="Patient Name"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/darkGray"
+            android:letterSpacing="0.02" />
+
+        <!-- Status Column -->
+        <TextView
+            android:id="@+id/tvPatientStatus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="STABLE"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:textColor="#4CAF50"
+            android:textStyle="bold" />
+
+        <!-- Timestamp Column -->
+        <TextView
+            android:id="@+id/tvPatientTimestamp"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.5"
+            android:text="12:30 PM"
+            android:textSize="14sp"
+            android:gravity="end"
+            android:textColor="@color/darkGray" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#1A1A2E">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="12dp"
+            android:background="#0D0D1A">
+
+            <Button
+                android:id="@+id/btnCritBack"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="← Back"
+                android:backgroundTint="#C62828"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textAllCaps="false"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:layout_marginStart="8dp">
+
+                <TextView
+                    android:id="@+id/tvCritName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Patient Name"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFF"
+                    android:gravity="center" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔴 CRITICAL WARD"
+                    android:textSize="11sp"
+                    android:textColor="#FF5252"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvCritLiveBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="● LIVE"
+                android:textSize="11sp"
+                android:textColor="#69F0AE"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+        </LinearLayout>
+
+        <!-- CAMERA — always visible, always streaming -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="260dp"
+            android:background="#000000">
+
+            <ImageView
+                android:id="@+id/imgCritCamera"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:contentDescription="Live patient camera" />
+
+            <!-- Camera overlay status -->
+            <TextView
+                android:id="@+id/tvCritCamStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|start"
+                android:layout_margin="8dp"
+                android:text="📷 Connecting camera..."
+                android:textSize="12sp"
+                android:textColor="#CCFFFFFF"
+                android:background="#88000000"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp" />
+
+            <!-- Loading spinner -->
+            <ProgressBar
+                android:id="@+id/pbCritCam"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:indeterminateTint="#E53935" />
+
+        </FrameLayout>
+
+        <!-- ALERT BANNER (shown when vitals breach threshold) -->
+        <LinearLayout
+            android:id="@+id/layoutCritAlert"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#B71C1C"
+            android:padding="12dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🚨 CRITICAL ALERT"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF" />
+
+            <TextView
+                android:id="@+id/tvCritAlertMsg"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="13sp"
+                android:textColor="#FFCDD2"
+                android:layout_marginTop="4dp" />
+
+        </LinearLayout>
+
+        <!-- VITALS CARD -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="12dp"
+            app:cardBackgroundColor="#16213E"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="6dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tvCritUpdated"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Waiting for vitals..."
+                    android:textSize="11sp"
+                    android:textColor="#888888"
+                    android:gravity="end"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- HR -->
+                <TextView
+                    android:id="@+id/tvCritHR"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="❤  HR: -- bpm"
+                    android:textSize="18sp"
+                    android:textColor="#EF5350"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- SpO2 -->
+                <TextView
+                    android:id="@+id/tvCritSpO2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🫁 SpO₂: -- %"
+                    android:textSize="18sp"
+                    android:textColor="#42A5F5"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- BP -->
+                <TextView
+                    android:id="@+id/tvCritBP"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="💉 BP: --/-- mmHg"
+                    android:textSize="18sp"
+                    android:textColor="#AB47BC"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- Temp -->
+                <TextView
+                    android:id="@+id/tvCritTemp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🌡 Temp: -- °C"
+                    android:textSize="18sp"
+                    android:textColor="#FFA726"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- RR -->
+                <TextView
+                    android:id="@+id/tvCritRR"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="〰 RR: -- rpm"
+                    android:textSize="18sp"
+                    android:textColor="#26C6DA"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- Glucose -->
+                <TextView
+                    android:id="@+id/tvCritGlucose"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🩸 Glucose: -- mg/dL"
+                    android:textSize="18sp"
+                    android:textColor="#66BB6A"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Patient ID chip -->
+        <TextView
+            android:id="@+id/tvCritId"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="8dp"
+            android:layout_marginStart="16dp"
+            android:text="Band ID: --"
+            android:textSize="12sp"
+            android:textColor="#555577"
+            android:fontFamily="monospace" />
+
+        <!-- STAFF ASSIGNMENT CARD -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="12dp"
+            app:cardBackgroundColor="#0D2137"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="4dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="👨‍⚕️ Medical Staff Assigned"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#90CAF9"
+                    android:layout_marginBottom="10dp" />
+
+                <TextView
+                    android:id="@+id/tvCritDoctor"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="👨‍⚕️ Primary Doctor: --"
+                    android:textSize="15sp"
+                    android:textColor="#E3F2FD"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:id="@+id/tvCritNurse"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="👩‍⚕️ Assigned Nurse: --"
+                    android:textSize="15sp"
+                    android:textColor="#E3F2FD"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:id="@+id/tvCritAssistant"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🩺 Assistant Doctor: --"
+                    android:textSize="14sp"
+                    android:textColor="#B0BEC5"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- ATTENDED LOG CARD -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="12dp"
+            app:cardBackgroundColor="#12112B"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="4dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <!-- Header row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="10dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="✅ Attendance Log"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="#CE93D8" />
+
+                    <Button
+                        android:id="@+id/btnCritAttended"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="Mark Attended"
+                        android:backgroundTint="#6A1B9A"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:textAllCaps="false"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp" />
+
+                </LinearLayout>
+
+                <!-- No-entry placeholder -->
+                <TextView
+                    android:id="@+id/tvCritNoAttended"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="No attendance recorded yet."
+                    android:textSize="13sp"
+                    android:textColor="#555577"
+                    android:gravity="center" />
+
+                <!-- Timestamp entries added programmatically -->
+                <LinearLayout
+                    android:id="@+id/layoutAttendedHistory"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- bottom spacer -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="24dp" />
+
+    </LinearLayout>
+
+</ScrollView>

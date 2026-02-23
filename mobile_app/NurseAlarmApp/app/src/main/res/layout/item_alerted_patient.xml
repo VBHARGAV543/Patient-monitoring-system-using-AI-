@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cardAlerted"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="10dp"
+    android:layout_marginEnd="10dp"
+    android:layout_marginTop="6dp"
+    android:layout_marginBottom="6dp"
+    app:cardBackgroundColor="#FFF3E0"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="5dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Top row: avatar + name + risk -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvAltAvatar"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:background="@drawable/circle_background"
+                android:backgroundTint="@color/coral"
+                android:gravity="center"
+                android:text="P"
+                android:textSize="20sp"
+                android:textColor="@color/textWhite"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginStart="14dp">
+
+                <TextView
+                    android:id="@+id/tvAltName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Patient Name"
+                    android:textSize="17sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/textPrimary" />
+
+                <TextView
+                    android:id="@+id/tvAltDisease"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Hypertension"
+                    android:textSize="13sp"
+                    android:textColor="@color/textSecondary"
+                    android:layout_marginTop="2dp" />
+
+            </LinearLayout>
+
+            <!-- Risk level chip -->
+            <TextView
+                android:id="@+id/tvAltRisk"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="HIGH"
+                android:textSize="12sp"
+                android:textColor="@color/textWhite"
+                android:textStyle="bold"
+                android:background="#F44336"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
+
+        </LinearLayout>
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#E0E0E0"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="10dp" />
+
+        <!-- Vitals summary (two columns) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvAltHR"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="❤  HR: 105 bpm"
+                    android:textSize="13sp"
+                    android:textColor="@color/dangerRed"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvAltSpO2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🫁 SpO₂: 88%"
+                    android:textSize="13sp"
+                    android:textColor="@color/textPrimary"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvAltBP"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💉 BP: 165/90"
+                    android:textSize="13sp"
+                    android:textColor="@color/textPrimary" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvAltTemp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🌡 Temp: 38.9°C"
+                    android:textSize="13sp"
+                    android:textColor="@color/textPrimary"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvAltRR"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="〰 RR: 24 rpm"
+                    android:textSize="13sp"
+                    android:textColor="@color/textPrimary"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvAltTime"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⏰ 14:32:15"
+                    android:textSize="12sp"
+                    android:textColor="@color/textSecondary" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Action buttons row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp"
+            android:gravity="center_vertical">
+
+            <!-- Cam button -->
+            <Button
+                android:id="@+id/btnCam"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="📷  Cam"
+                android:textSize="14sp"
+                android:textColor="@color/textWhite"
+                android:textAllCaps="false"
+                android:backgroundTint="#1565C0"
+                android:fontFamily="sans-serif-medium" />
+
+            <!-- Attended button -->
+            <Button
+                android:id="@+id/btnAttended"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="2"
+                android:text="✓  Attended — Clear Alert"
+                android:textSize="14sp"
+                android:textColor="@color/textWhite"
+                android:textAllCaps="false"
+                android:backgroundTint="@color/successGreen"
+                android:fontFamily="sans-serif-medium" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

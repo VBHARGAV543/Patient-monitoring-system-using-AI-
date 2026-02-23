@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cardPatient"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="8dp"
+    android:layout_marginEnd="8dp"
+    android:layout_marginTop="6dp"
+    android:layout_marginBottom="6dp"
+    app:cardBackgroundColor="@color/cardBackground"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="3dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="18dp"
+        android:gravity="center_vertical">
+
+        <!-- Avatar Circle -->
+        <TextView
+            android:id="@+id/tvAvatar"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:background="@drawable/circle_background"
+            android:gravity="center"
+            android:text="P"
+            android:textSize="20sp"
+            android:textColor="@color/textWhite"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium" />
+
+        <!-- Patient Info -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="16dp">
+
+            <!-- Name -->
+            <TextView
+                android:id="@+id/tvPatientName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Patient Name"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:textColor="@color/textPrimary"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.01" />
+
+            <!-- Status & Timestamp -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="4dp">
+
+                <TextView
+                    android:id="@+id/tvPatientStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="STABLE"
+                    android:textSize="13sp"
+                    android:textColor="@color/successGreen"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=" • "
+                    android:textColor="@color/textSecondary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/tvPatientTimestamp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="12:30 PM"
+                    android:textSize="13sp"
+                    android:textColor="@color/textSecondary"
+                    android:fontFamily="sans-serif" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Status Indicator Dot -->
+        <View
+            android:id="@+id/viewStatusDot"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:background="@drawable/circle_background"
+            android:backgroundTint="@color/successGreen"
+            android:layout_marginStart="12dp" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

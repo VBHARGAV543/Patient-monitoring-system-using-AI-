@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Alarm Fatigue Monitoring System: An Intelligent Patient Monitoring Platform"
+abstract: "A comprehensive alarm fatigue monitoring system featuring real-time patient vital monitoring, intelligent alarm routing based on ward assignments, ESP32 sensor integration, and machine learning-based alarm prediction. The system addresses healthcare alarm fatigue by implementing context-aware alarm management and predictive analytics."
+authors:
+  - family-names: "Vishnubhotla Chandrasekhar"
+    given-names: "Bhargav"
+    orcid: "https://orcid.org/0009-0000-5586-0823"
+version: 1.0.0
+date-released: 2025-12-18
+url: "https://github.com/VBHARGAV543/Patient-monitoring-system-using-AI"
+repository-code: "https://github.com/VBHARGAV543/Patient-monitoring-system-using-AI"
+keywords:
+  - alarm fatigue
+  - patient monitoring
+  - healthcare technology
+  - machine learning
+  - ESP32
+  - real-time monitoring
+  - alarm management
+  - predictive analytics
+license: MIT
+preferred-citation:
+  type: software
+  title: "Alarm Fatigue Monitoring System: An Intelligent Patient Monitoring Platform"
+  authors:
+    - family-names: "Vishnubhotla Chandrasekhar"
+      given-names: "Bhargav"
+  year: 2025
+  url: "https://github.com/VBHARGAV543/Patient-monitoring-system-using-AI"

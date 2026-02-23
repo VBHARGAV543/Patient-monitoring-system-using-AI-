@@ -1,0 +1,52 @@
+# Environment variables
+.env
+**/.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.pyc
+
+# Node
+node_modules/
+dist/
+build/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*~
+
+# ML model binaries
+*.pkl
+*.pth
+
+# Android build outputs
+mobile_app/NurseAlarmApp/.gradle/
+mobile_app/NurseAlarmApp/build/
+mobile_app/NurseAlarmApp/app/build/
+mobile_app/NurseAlarmApp/local.properties
+*.apk
+*.aab
