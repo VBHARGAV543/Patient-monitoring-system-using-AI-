@@ -1,125 +1,216 @@
-Alarm Fatigue Monitoring Prototype
-=================================
+# Patient Monitoring System Using AI
 
-Overview
---------
-This repository contains a working prototype for an alarm-fatigue monitoring system. The system simulates patient vitals, runs lightweight ML/rule logic in a FastAPI backend, and drives physical alarms via an ESP32 gateway. It was built for demonstration and testing of alarm routing, alarm frequency, and basic alarm fatigue mitigation ideas.
+A real-time, AI-powered hospital patient monitoring system with a **FastAPI backend**, **React web frontend**, and **Android Kotlin mobile app** for nurses. Supports hardware mode (real ESP32 sensors) and simulation mode (AI-driven synthetic vitals) with a full ML pipeline for intelligent alarm classification.
 
-Main components
----------------
-- ESP32 #1 — Sensor Station (simulated):
-  - Simulates HR, SpO2, temperature and `nurse_nearby` status.
-  - Posts JSON to backend endpoint: `/api/sensor-data` every ~5s.
-  - Periodically polls `/api/alarm-status` to display alarm status (LCD or Serial).
-  - LEDs indicate WiFi/send status.
+---
 
-- ESP32 #2 — Alarm Gateway/Controller:
-  - Polls backend `/api/alarm-status` every few seconds.
-  - Activates physical alarm(s) (relay or direct buzzer pin) and LED indicators when an alarm is reported.
-  - Hosts a small web server for manual testing: `/alarm/general`, `/alarm/critical`, `/alarm/stop`, `/status`.
+## System Overview
 
-- Backend — FastAPI (Python / Uvicorn):
-  - Endpoints: `/api/sensor-data` (POST), `/api/alarm-status` (GET). WebSocket endpoint included for dashboard updates.
-  - Loads ML models (if present) and performs policy/ML inference; returns JSON with fields like `general_alarm` and `critical_alarm`.
-  - For testing, the backend was temporarily modified to return `general_alarm: true` every 2nd status request to exercise ESP behavior.
+```
+ESP32 (HR + SpO2 + Temp)
+         │
+         ▼
+  FastAPI Backend  (Port 8000)
+  ├─ ML Alarm Classifier (Random Forest)
+  ├─ NEWS2 Scoring Engine
+  ├─ Disease Profile System
+  ├─ Vital Estimator (Hardware Mode)
+  ├─ OpenCV Camera Stream
+  ├─ WebSocket Real-time Events
+  └─ Supabase PostgreSQL
+         │
+         ├──── React Frontend (Port 3000)
+         └──── Android Nurse App (Kotlin)
+```
 
-Where to find things in the repo
---------------------------------
-- `backend/main.py` — FastAPI app, endpoints, ML integration and the temporary "force-true" test.
-- `ESP sketches/` or user Arduino sketches — (ESP1 and ESP2 sketches) — the current working sketches are the ones you edited in the Arduino IDE (`health.ino` etc.).
-- Arduino libraries: `C:\Users\Lenovo\Documents\Arduino\libraries\esp32-LiquidCrystal_I2C-master` — local LCD library used (patched locally).
+---
 
-How to run (Windows PowerShell)
--------------------------------
-1. Activate project virtualenv and run backend (from project folder):
+## Features
+
+### Backend
+- Real-time vital signs monitoring (HR, SpO2, BP, Temperature, RR, Glucose)
+- **NEWS2 scoring** — National Early Warning Score 2 (RCP 2017 standard)
+- **Random Forest ML classifiers** — separate models for General and Critical wards, trained on 8,000 synthetic MIMIC-grounded samples each
+- **Personalised alarm logic** — same vitals score differently depending on disease, active medications, and patient age
+- **Vital estimator** — when using hardware (only 3 real sensors), ML regression estimates the 4 unmeasured vitals
+- **Disease profile system** — 12+ diseases with realistic medication effects
+- **OpenCV camera stream** — background thread captures webcam; instant JPEG snapshot endpoint (<10 ms)
+- WebSocket real-time broadcasts to all connected clients
+- Automatic discharge of stale patients on server restart
+- Demo mode with controlled vital tampering scenarios (Normal / Mild / Critical / False Positive)
+
+### Web Frontend (React + Vite)
+- Admit patient with full medical profile, disease, ward type
+- Animated staff assignment section (required for Critical ward — validates Primary Doctor + Nurse)
+- Live patient dashboard with vitals and alarm history
+- General and Critical ward views
+
+### Android Nurse App (Kotlin)
+- WebSocket-driven General Ward live alarm list
+- Critical Ward section — fetches admitted CRITICAL patients from backend
+- Critical patient detail screen: live camera, 6 vitals, alert banner
+- **Pre-click TTS voice alerts** — speaks alarm before nurse opens patient card (polls every 15s)
+- **Staff display** — shows assigned doctor and nurse on patient detail screen
+- **Mark Attended log** — timestamps each nurse visit, persisted across sessions (SharedPreferences)
+- CRITICAL alarms correctly excluded from General Ward list
+
+---
+
+## Hardware (Optional)
+
+| Component | Role | Interface |
+|---|---|---|
+| ESP32 | Main MCU — sends sensor readings over WiFi | HTTP POST JSON |
+| MAX30102 | Heart Rate + SpO2 | I2C |
+| DS18B20 | Body temperature (°C) | OneWire |
+
+In hardware mode, only HR, SpO2, and Temp are real. The backend ML regressor estimates BP, RR, and Glucose from these 3 inputs.
+
+---
+
+## ML Pipeline
+
+### NEWS2 Algorithm
+**Source:** https://www.rcplondon.ac.uk/projects/outputs/national-early-warning-score-news-2
+
+Scores 6 vital parameters (RR, SpO2, BP_sys, HR, Consciousness, Temp) on a 0–20 scale:
+- **0–4** → LOW (Safe)
+- **5–6** → MEDIUM (Warning)
+- **≥7** → HIGH (Critical)
+
+### Personalised Adjustments
+The system escalates alarms beyond the raw NEWS2 score when treatment is failing:
+- Hypertension patient on BP medication but BP still > 155 mmHg → escalate
+- Diabetic on insulin but glucose > 220 mg/dL → escalate
+- Asthma patient on bronchodilator but SpO2 < 90% → critical
+- Pneumonia patient on antibiotics but fever > 39.5°C → escalate
+- Age ≥ 70 with elevated score → additional risk amplification
+
+### ML Models
+
+| Model | Ward | Features | Algorithm | Samples |
+|---|---|---|---|---|
+| `general_model.pkl` | General | 19 | RandomForestClassifier | 8,000 |
+| `critical_model.pkl` | Critical | 20 | RandomForestClassifier | 8,000 |
+| `vital_estimator.pkl` | Both | 17 | RandomForestRegressor ×4 | 16,000 |
+
+Output labels: **0 = Safe**, **1 = Warning**, **2 = Critical**
+
+---
+
+## Project Structure
+
+```
+├── backend/
+│   ├── main.py              # FastAPI app (1487 lines), all endpoints
+│   ├── ml_predictor.py      # Loads .pkl models, builds feature vectors
+│   ├── alarm_policy.py      # Alarm suppression logic per ward type
+│   ├── disease_profiles.py  # 12+ disease definitions with medications
+│   ├── vital_estimator.py   # Hardware-mode vital regression
+│   ├── database.py          # asyncpg Supabase layer
+│   ├── schemas.py           # Pydantic request/response models
+│   └── requirements.txt
+│
+├── ML/
+│   ├── news2.py             # Full NEWS2 scorer + personalised adjustment
+│   ├── simulate_data_general.py   # MIMIC-grounded training data generator
+│   ├── simulate_data_critical.py  # Critical ward training data generator
+│   ├── train_general.py     # Train general ward RF classifier
+│   ├── train_critical.py    # Train critical ward RF classifier
+│   └── train_vital_estimator.py   # Train vital regression models
+│
+├── frontend_new/            # React + Vite web frontend (Port 3000)
+│   └── src/
+│       ├── pages/
+│       ├── components/
+│       └── services/
+│
+├── mobile_app/
+│   └── NurseAlarmApp/       # Android Kotlin app
+│       └── app/src/main/java/com/example/nursealarmapp/
+│
+└── PROJECT_OVERVIEW.md      # Full technical documentation
+```
+
+---
+
+## Quick Start
+
+### 1. Backend
 
 ```powershell
-cd "C:\Users\Lenovo\Desktop\Alarm fatigue #prototype\backend"
-# If you use the created venv
-.\venv\Scripts\python.exe -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+cd backend
+pip install -r requirements.txt
+# Copy .env.example to .env and fill in DATABASE_URL (Supabase)
+$env:PYTHONUTF8="1"
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-2. Confirm backend is up by opening in a browser (replace IP if your PC has a different local IP):
+API docs available at: `http://localhost:8000/docs`
 
-```
-http://localhost:8000/docs
-# or
-http://192.168.223.101:8000/docs
-```
-
-3. Upload ESP sketches
-- ESP32 #1 (Sensor station): open the sensor sketch in Arduino IDE, set WiFi SSID/password and backend IP (`serverURL` and `alarmStatusURL`), and flash.
-- ESP32 #2 (Alarm gateway): open the gateway sketch, set WiFi and backend URL, choose whether you use relay pins (GPIO 26/27) or direct buzzer pin (GPIO 25) and flash.
-
-4. Optional: Serve the frontend (dashboard)
-- In the `landing page` folder, run a simple HTTP server to view the dashboard:
+### 2. Train ML Models (first time only)
 
 ```powershell
-cd "C:\Users\Lenovo\Desktop\Alarm fatigue #prototype\landing page"
-python -m http.server 3000
+cd ML
+python train_general.py          # → general_model.pkl
+python train_critical.py         # → critical_model.pkl
+python train_vital_estimator.py  # → vital_estimator.pkl  (copy to backend/)
 ```
 
-Then open `http://localhost:3000` in a browser.
+### 3. Frontend
 
-Hardware wiring summary
------------------------
-- ESP32 #1 (Sensor station):
-  - I2C: SDA=21, SCL=22 shared for LCD and MAX30100 (if used)
-  - LM35 analog -> GPIO34 (LM35_PIN)
-  - LEDs as in sketch (GREEN_LED=2, RED_LED=4, YELLOW_LED=5)
+```powershell
+cd frontend_new
+npm install
+npx vite --host --port 3000
+```
 
-- ESP32 #2 (Gateway):
-  - Relay controls (if used): RELAY1_PIN=26 (general), RELAY2_PIN=27 (critical)
-  - Or direct buzzer: BUZZER_PIN=25 (if you removed relay)
-  - LEDs: BLUE_LED=2 (WiFi), ORANGE_LED=18 (alarm), WHITE_LED=19 (system ready)
+### 4. Android App
 
-LCD (I2C) notes & fix
----------------------
-- The local library `esp32-LiquidCrystal_I2C-master` provides a C-style API (functions named `LCDI2C_*`) and expects explicit SDA/SCL pins when initializing: `LCDI2C_init(0x27,16,2,21,22);`.
-- If you used a different `LiquidCrystal_I2C` library (Arduino-style object `LiquidCrystal_I2C lcd(...)`), that can cause incompatibilities.
-- Compilation error fix done locally: the library used `ets_delay_us()` which is deprecated; changed calls to `esp_rom_delay_us()` in `LiquidCrystal_I2C.c` to work with modern ESP32 Arduino core.
-  - File patched: `C:\Users\Lenovo\Documents\Arduino\libraries\esp32-LiquidCrystal_I2C-master\LiquidCrystal_I2C.c` (replace `ets_delay_us` → `esp_rom_delay_us`).
+```powershell
+cd mobile_app/NurseAlarmApp
+.\gradlew installDebug
+```
 
-How the alarm flow works (quick)
---------------------------------
-1. ESP1 sends vitals: POST /api/sensor-data.
-2. Backend processes (ML/rules) and makes a decision.
-3. ESP2 polls GET /api/alarm-status:
-   - If `general_alarm: true` or `critical_alarm: true` → ESP2 calls `activateAlarm()` (drive buzzer/relay + LED).
-   - When flags are false, ESP2 stops alarms or runs the 'no-alarm' LED/beep sequence.
-4. ESP1 also polls alarm-status and displays status on LCD/Serial.
+Set the backend IP in the app's Network Settings to match your machine's LAN IP.
 
-Common problems & fixes
------------------------
-- HTTPClient returns `-1` or POST fails:
-  - Backend not running or firewall blocking port 8000.
-  - Wrong IP in sketch (use local machine IP or host reachable by ESP).
-  - Ensure all devices (PC and ESPs) are on same network.
+---
 
-- LCD compile errors:
-  - Use the ESP32-specific library or johnrickman/marcoschwartz `LiquidCrystal_I2C` that supports ESP32.
-  - If library uses `ets_delay_us`, replace with `esp_rom_delay_us`.
+## API Endpoints
 
-- Backend not triggering alarms:
-  - ML/rule thresholds not met by simulated data.
-  - For testing, backend has a temporary mode to force `general_alarm:true` every 2nd `/api/alarm-status` call. Remove this after testing.
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/patient/admit` | Admit new patient |
+| `GET` | `/api/patient/active` | Get currently active patient |
+| `GET` | `/api/patients/admitted` | List admitted patients (`?patient_type=CRITICAL`) |
+| `POST` | `/api/patient/{id}/discharge` | Discharge a patient |
+| `GET` | `/api/patient/{id}/vitals/latest` | Latest vital signs |
+| `POST` | `/api/sensor/data` | Receive ESP32 sensor data |
+| `GET` | `/snapshot` | Latest camera JPEG |
+| `GET` | `/stream` | MJPEG camera stream |
+| `WS` | `/ws` | Real-time WebSocket events |
 
-Testing steps (smoke test)
---------------------------
-1. Start backend and confirm `/docs` opens.
-2. Flash ESP1; monitor Serial — it should show readings and successful POST responses (200).
-3. Flash ESP2; open `http://<esp2_ip>/` to use manual alarm buttons. Observe relay/buzzer activation and LED states.
-4. Use backend forced-true or trigger conditions that produce `general_alarm:true`; ESP2 should start the buzzer/relay.
+---
 
-Next improvements
-----------------
-- Add a dashboard page showing live vitals and alarm history.
-- Improve backend policy to avoid frequent false positives and add rate-limiting of alarms to reduce fatigue.
-- Add persistent logging of alarm events to a file or DB for analysis.
-- Add unit tests for backend ML mapping and a Dockerfile for easier deployment.
+## Environment Variables
 
+Create a `.env` file in `backend/`:
 
+```
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your_key
+BAND_ID=BAND_01
+```
 
-DATE:18-12-2025
+---
 
-made an mobile app and added few more changes to project like switching from html to reactjs and few more frontend and backend changes #unpolished version
+## Full Technical Documentation
+
+See [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) for complete details including all formulas, feature vectors, disease databases, alarm thresholds, database schema, and implementation notes.
+
+---
+
+## License
+
+See [LICENSE](LICENSE) for details.
