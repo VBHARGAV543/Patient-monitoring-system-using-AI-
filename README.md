@@ -1,6 +1,6 @@
 # Patient Monitoring System Using AI
 
-An embedded-first patient monitoring platform built as a final-year ECE project. It centers on real sensor acquisition, ESP32-based data transmission, and hardware-software integration, with software layers supporting visualization, alerting, and patient tracking.
+An embedded-first patient monitoring platform built as an ECE project. It centers on real sensor acquisition, ESP32-based data transmission, and hardware-software integration, with software layers supporting visualization, alerting, and patient tracking.
 
 ## At a Glance
 
