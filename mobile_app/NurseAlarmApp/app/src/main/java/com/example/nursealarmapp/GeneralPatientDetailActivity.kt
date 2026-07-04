@@ -101,7 +101,6 @@ class GeneralPatientDetailActivity : AppCompatActivity() {
             startActivity(intent)
         }
         findViewById<Button>(R.id.btnGwdCamera).setOnClickListener(openCamera)
-        findViewById<Button>(R.id.btnGwdFullscreenCamera).setOnClickListener(openCamera)
 
         btnAttended.setOnClickListener {
             GeneralWardManager.markAttended(patientId)

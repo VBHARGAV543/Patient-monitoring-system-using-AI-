@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FIG. 4</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Times New Roman', Times, serif; background: #fff; color: #000; padding: 40px 32px; }
+    header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 6px; }
+    header h1 { font-size: 1.15rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; }
+    header p { font-size: 0.85rem; margin-top: 4px; }
+    .fig-label { text-align: center; font-size: 0.85rem; margin: 8px 0 20px; font-style: italic; }
+    .diagram-wrapper { max-width: 1100px; margin: 0 auto; overflow-x: auto; }
+    .mermaid { display: flex; justify-content: center; }
+    footer { text-align: center; border-top: 1px solid #000; margin-top: 36px; padding-top: 10px; font-size: 0.78rem; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Adaptive Patient Monitoring and Context-Aware Clinical Alert Management System Using Wearable Bands</h1>
+  <p>Method and System for Real-Time Vital Sign Acquisition, ML-Based Risk Classification, and Proximity-Aware Alarm Routing</p>
+</header>
+<p class="fig-label">FIG. 4 &mdash; Logging, Real-Time Broadcast, Nurse Proximity Feedback, and Discharge</p>
+<div class="diagram-wrapper">
+  <div class="mermaid">
+flowchart TD
+
+    IN1(["Input: Alert Dispatched
+    from FIG. 3, Step 134"]) --> LOG[("Step 134: Log Alarm Event to Database
+    Table: alarm_events
+    Fields: vitals snapshot, alarm status, timestamp")]
+
+    IN2(["Input: Alarm Suppressed
+    from FIG. 3, Step 135"]) --> LOG2[("Step 135: Log Vital Reading to Database
+    Table: vital_signs_log
+    5-second interval time-series record")]
+
+    LOG --> BC["Step 136: WebSocket Broadcast
+    Endpoint: /ws
+    Push update to all connected client sessions"]
+    LOG2 --> BC
+
+    BC --> FE["Step 137: Web Dashboard Client
+    React and Vite, Port 3000
+    Displays: Live vital sign charts,
+    Alarm status banner, Webcam feed,
+    Alarm event history log"]
+
+    BC --> APP["Step 138: Android Nurse Application
+    Kotlin with Coroutines
+    Dispatches: Push notification,
+    Device vibration, TTS voice alert,
+    Patient list grouped by ward type"]
+
+    CAM["Step 145: Camera Manager
+    OpenCV background thread
+    Captures frames continuously at 30 FPS"] --> CAMF["Step 146: Serve Latest Frame
+    GET /api/camera/snapshot
+    Returns current JPEG frame
+    Response latency under 10ms"]
+    CAMF --> FE
+
+    APP --> NP["Step 139: Nurse Activates
+    Near-Patient Toggle
+    on Mobile Application"]
+    NP --> NP2["Step 140: Transmit Proximity State to Backend
+    POST /api/nurse/proximity
+    Payload: session_id, is_near_patient"]
+    NP2 --> PROX(["Proximity state fed back
+    to FIG. 3 Step 128
+    for alarm routing decision"])
+
+    FE --> DIS{"Step 141: Discharge Patient?"}
+
+    DIS -->|"No - Continue Monitoring"| LOOP(["Return to FIG. 1 Step 113
+    Next vital reading cycle"])
+
+    DIS -->|"Yes"| DIS2["Step 142: POST /api/patients/discharge
+    Patient status set to DISCHARGED
+    Monitoring wearable band de-assigned"]
+    DIS2 --> DIS3[("Step 143: Update Patient Record
+    in Cloud Database
+    discharge_time field recorded")]
+    DIS3 --> DIS4["Step 144: Patient History Available
+    in Records View
+    Full vital sign log and alarm event log
+    accessible for clinical review"]
+    DIS4 --> Z([END])
+  </div>
+</div>
+<footer>
+  Adaptive Patient Monitoring and Context-Aware Clinical Alert Management System Using Wearable Bands &mdash; FIG. 4 of 4
+</footer>
+<script>
+  mermaid.initialize({
+    startOnLoad: true, theme: 'base', flowchart: { curve: 'linear', nodeSpacing: 50, rankSpacing: 55, padding: 16 },
+    themeVariables: { primaryColor: '#ffffff', primaryTextColor: '#000000', primaryBorderColor: '#000000',
+      lineColor: '#000000', secondaryColor: '#ffffff', tertiaryColor: '#ffffff',
+      edgeLabelBackground: '#ffffff', fontFamily: 'Times New Roman, Times, serif', fontSize: '13px' }
+  });
+</script>
+</body>
+</html>

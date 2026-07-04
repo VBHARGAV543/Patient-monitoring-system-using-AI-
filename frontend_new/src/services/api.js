@@ -190,6 +190,16 @@ export const getApiHealth = async () => {
   return response.data;
 };
 
+/**
+ * Force-release the band if it is stuck as occupied.
+ * Discharges any lingering ACTIVE patient and clears the band assignment.
+ * @returns {Promise} Release result
+ */
+export const resetBand = async () => {
+  const response = await apiClient.post('/api/band/reset');
+  return response.data;
+};
+
 // ===========================
 // LEGACY APIs (Backward Compatibility)
 // ===========================

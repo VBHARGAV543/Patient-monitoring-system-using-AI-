@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FIG. 3</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Times New Roman', Times, serif; background: #fff; color: #000; padding: 40px 32px; }
+    header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 6px; }
+    header h1 { font-size: 1.15rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; }
+    header p { font-size: 0.85rem; margin-top: 4px; }
+    .fig-label { text-align: center; font-size: 0.85rem; margin: 8px 0 20px; font-style: italic; }
+    .diagram-wrapper { max-width: 1100px; margin: 0 auto; overflow-x: auto; }
+    .mermaid { display: flex; justify-content: center; }
+    footer { text-align: center; border-top: 1px solid #000; margin-top: 36px; padding-top: 10px; font-size: 0.78rem; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Adaptive Patient Monitoring and Context-Aware Clinical Alert Management System Using Wearable Bands</h1>
+  <p>Method and System for Real-Time Vital Sign Acquisition, ML-Based Risk Classification, and Proximity-Aware Alarm Routing</p>
+</header>
+<p class="fig-label">FIG. 3 &mdash; Alarm Policy Engine and Context-Aware Alert Routing</p>
+<div class="diagram-wrapper">
+  <div class="mermaid">
+flowchart TD
+
+    IN(["Input: Combined Risk Score
+    from FIG. 2, Step 123"]) --> U{"Step 124: Patient Ward Type?"}
+
+    U -->|"General Ward"| V{"Step 125: Random Forest
+    Output equals 0?"}
+
+    V -->|"Yes"| W1["Step 126: SUPPRESS ALARM
+    Alarm fatigue reduction policy applied
+    No alert dispatched to any output channel"]
+
+    V -->|"No"| V2{"Step 127: Count of Critical Vital
+    Threshold Breaches is 2 or more?
+    HR greater than 130 or less than 50
+    SpO2 less than 88
+    Temp greater than 39.5 or less than 35
+    BP sys greater than 180 mmHg"}
+
+    V2 -->|"No - Mildly Abnormal Only"| W1
+    V2 -->|"Yes - Genuinely Critical"| V3{"Step 128: Nurse Device
+    in BLE Proximity?"}
+
+    V3 -->|"Yes"| W2["Step 129: Issue PROXIMITY ALERT
+    Trigger vibration alert on nurse mobile device
+    route_to_nurse flag set to True
+    Alert sent via WebSocket to nurse session"]
+
+    V3 -->|"No - No Nurse Nearby"| W3["Step 130: Issue DASHBOARD ALERT
+    Escalate alarm to web dashboard display
+    route_to_dashboard flag set to True
+    Visible alarm banner displayed on screen"]
+
+    U -->|"Critical Ward"| X{"Step 131: Random Forest
+    Output equals 0?"}
+
+    X -->|"Yes - High Confidence Safe"| W4["Step 132: SUPPRESS ALARM
+    Minimal suppression applied
+    Only for critical ward patients where
+    RF model predicts safe with high confidence"]
+
+    X -->|"No - Alarm Condition"| W5["Step 133: Issue FULL ALERT
+    Alarm simultaneously routed to:
+    1. Web Dashboard visual banner
+    2. Android Nurse App push notification
+    3. Text-to-Speech voice announcement
+    30-second TTS cooldown period enforced"]
+
+    W1 --> OUT1(["Output: Suppressed
+    Proceed to FIG. 4 Step 135"])
+    W4 --> OUT1
+
+    W2 --> OUT2(["Output: Alert Dispatched
+    Proceed to FIG. 4 Step 134"])
+    W3 --> OUT2
+    W5 --> OUT2
+  </div>
+</div>
+<footer>
+  Adaptive Patient Monitoring and Context-Aware Clinical Alert Management System Using Wearable Bands &mdash; FIG. 3 of 4
+</footer>
+<script>
+  mermaid.initialize({
+    startOnLoad: true, theme: 'base', flowchart: { curve: 'linear', nodeSpacing: 50, rankSpacing: 55, padding: 16 },
+    themeVariables: { primaryColor: '#ffffff', primaryTextColor: '#000000', primaryBorderColor: '#000000',
+      lineColor: '#000000', secondaryColor: '#ffffff', tertiaryColor: '#ffffff',
+      edgeLabelBackground: '#ffffff', fontFamily: 'Times New Roman, Times, serif', fontSize: '13px' }
+  });
+</script>
+</body>
+</html>

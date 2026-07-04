@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FIG. 1</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Times New Roman', Times, serif; background: #fff; color: #000; padding: 40px 32px; }
+    header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 6px; }
+    header h1 { font-size: 1.15rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; }
+    header p { font-size: 0.85rem; margin-top: 4px; }
+    .fig-label { text-align: center; font-size: 0.85rem; margin: 8px 0 20px; font-style: italic; }
+    .diagram-wrapper { max-width: 1100px; margin: 0 auto; overflow-x: auto; }
+    .mermaid { display: flex; justify-content: center; }
+    footer { text-align: center; border-top: 1px solid #000; margin-top: 36px; padding-top: 10px; font-size: 0.78rem; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Adaptive Patient Monitoring and Context-Aware Clinical Alert Management System Using Wearable Bands</h1>
+  <p>Method and System for Real-Time Vital Sign Acquisition, ML-Based Risk Classification, and Proximity-Aware Alarm Routing</p>
+</header>
+<p class="fig-label">FIG. 1 &mdash; Patient Admission and Data Acquisition</p>
+<div class="diagram-wrapper">
+  <div class="mermaid">
+flowchart TD
+
+    A([START]) --> B["Step 101: Patient Arrives at Hospital"]
+    B --> B1["Step 102: Clinician Enters Patient Data
+    Name, Age, Gender, Disease Diagnosis,
+    Ward Type, Allergies, Current Medications"]
+    B1 --> C{"Step 103: Ward Classification"}
+    C -->|"General Ward"| D1["Step 104a: Generate General Ward Disease Profile
+    Hypertension, UTI, Pneumonia, Diabetes, Gastroenteritis"]
+    C -->|"Critical Ward"| D2["Step 104b: Generate Critical Ward Disease Profile
+    Heart Attack, Stroke, Sepsis, Severe Pneumonia, Acute Resp. Failure"]
+    D1 --> E["Step 105: Assign Disease-Specific Baseline Vital Ranges
+    HR, SpO2, Temp, BP sys, BP dia, RR, Glucose"]
+    D2 --> E
+    E --> F[("Step 106: Persist Patient Record to Cloud Database
+    patients table")]
+    F --> G["Step 107: Load Patient Profile into Server Memory"]
+
+    G --> H{"Step 108: Data Source Mode?"}
+
+    H -->|"Hardware Mode"| I["Step 109: ESP32 Microcontroller Reads Physical Sensors
+    MAX30102: Heart Rate and SpO2
+    DS18B20: Body Temperature"]
+    I --> I1["Step 110: Transmit Sensor Data via HTTP POST
+    Endpoint: /api/sensor/data
+    Payload: hr, spo2, temp"]
+    I1 --> J["Step 111: Vital Estimator Regression Model
+    vital_estimator.pkl
+    Inputs: HR, SpO2, Temp"]
+    J --> J1["Step 112: Estimate Unmeasured Vitals
+    BP sys, BP dia, Respiratory Rate, Blood Glucose
+    Labeled as estimated in user interface"]
+    J1 --> K["Step 113: Assemble Complete 7-Vital Reading
+    Proceed to FIG. 2"]
+
+    H -->|"Simulation Mode"| L["Step 114: Background Coroutine
+    simulate_vitals_background()
+    Executes every 5 seconds"]
+    L --> M["Step 115: Synthesize Vitals from Disease Profile
+    with Gaussian Noise
+    HR, SpO2, Temp, BP, RR, Glucose"]
+    M --> N{"Step 116: Demo Scenario Applied?"}
+    N -->|"None"| K
+    N -->|"Mild Deterioration"| O1["Step 117a: Offset BP, Temp, HR
+    toward mildly elevated ranges"] --> K
+    N -->|"Critical Emergency"| O2["Step 117b: Set life-threatening values
+    HR greater than 150, SpO2 less than 85,
+    BP sys greater than 200, Temp greater than 40"] --> K
+    N -->|"False Positive"| O3["Step 117c: Set edge-case values
+    at alarm decision thresholds"] --> K
+  </div>
+</div>
+<footer>
+  Adaptive Patient Monitoring and Context-Aware Clinical Alert Management System Using Wearable Bands &mdash; FIG. 1 of 4
+</footer>
+<script>
+  mermaid.initialize({
+    startOnLoad: true, theme: 'base', flowchart: { curve: 'linear', nodeSpacing: 50, rankSpacing: 55, padding: 16 },
+    themeVariables: { primaryColor: '#ffffff', primaryTextColor: '#000000', primaryBorderColor: '#000000',
+      lineColor: '#000000', secondaryColor: '#ffffff', tertiaryColor: '#ffffff',
+      edgeLabelBackground: '#ffffff', fontFamily: 'Times New Roman, Times, serif', fontSize: '13px' }
+  });
+</script>
+</body>
+</html>

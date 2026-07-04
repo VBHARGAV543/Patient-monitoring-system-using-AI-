@@ -228,7 +228,7 @@ def predict_alarm(vitals: dict, patient_type: str, patient_profile=None) -> dict
     if bundle is None:
         return _news2_fallback(vitals, patient_type, patient_profile)
 
-    model = bundle["model"]
+    model = bundle["model"] if isinstance(bundle, dict) else bundle
 
     if is_critical:
         feat = _build_critical_features(vitals, patient_profile)

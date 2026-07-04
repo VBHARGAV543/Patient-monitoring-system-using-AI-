@@ -1003,14 +1003,19 @@ async def receive_sensor_data(sensor_data: RealSensorData):
         is_hardware_mode = patient.get('hardware_mode', False)
 
         if is_hardware_mode:
-            estimated = vital_estimator.estimate_missing_vitals(
-                HR=sensor_data.HR,
-                SpO2=sensor_data.SpO2,
-                Temp=sensor_data.Temp,
-                age=patient.get('age', 50),
-                patient_type=patient['patient_type'],
-                disease=patient.get('problem', ''),
-            )
+            # Try ML estimator; fall back to safe defaults if pkl is incompatible
+            try:
+                estimated = vital_estimator.estimate_missing_vitals(
+                    HR=sensor_data.HR,
+                    SpO2=sensor_data.SpO2,
+                    Temp=sensor_data.Temp,
+                    age=patient.get('age', 50),
+                    patient_type=patient['patient_type'],
+                    disease=patient.get('problem', ''),
+                )
+            except Exception as est_err:
+                print(f"[WARN] vital_estimator failed ({est_err}), using safe defaults for estimated fields")
+                estimated = {"BP_sys": 120, "BP_dia": 80, "RR": 16, "Glucose": 100}
             vitals = {
                 "HR":     sensor_data.HR,          # real -- MAX30102
                 "SpO2":   sensor_data.SpO2,        # real -- MAX30102
@@ -1117,6 +1122,8 @@ async def receive_sensor_data(sensor_data: RealSensorData):
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to process sensor data: {str(e)}")
 
 
@@ -1177,6 +1184,81 @@ async def nurse_websocket_endpoint(session_id: str, websocket: WebSocket):
         import traceback
         traceback.print_exc()
         manager.disconnect_nurse(session_id)
+
+
+# ========== WebRTC Signaling ==========
+# Simple lobby: one broadcaster + N viewers in a named room.
+# Backend only relays JSON signaling messages — no media passes through.
+
+_webrtc_rooms: dict[str, dict] = {}  # room_id -> {"broadcaster": ws | None, "viewers": [ws]}
+
+
+@app.websocket("/ws/webrtc/{room_id}/{role}")
+async def webrtc_signaling(room_id: str, role: str, websocket: WebSocket):
+    """
+    WebRTC signaling relay.
+    role = "broadcaster"  →  sends offer + ICE candidates to all viewers
+    role = "viewer"       →  receives offer, sends answer back to broadcaster
+    """
+    await websocket.accept()
+    print(f"[WebRTC] {role} joined room '{room_id}'")
+
+    # Ensure room exists
+    if room_id not in _webrtc_rooms:
+        _webrtc_rooms[room_id] = {"broadcaster": None, "viewers": []}
+
+    room = _webrtc_rooms[room_id]
+
+    if role == "broadcaster":
+        room["broadcaster"] = websocket
+    else:
+        room["viewers"].append(websocket)
+        # Tell the broadcaster that a new viewer joined so it can send a fresh offer
+        if room["broadcaster"]:
+            try:
+                await room["broadcaster"].send_text(json.dumps({"type": "viewer_joined"}))
+            except Exception:
+                pass
+
+    try:
+        while True:
+            raw = await websocket.receive_text()
+            msg = json.loads(raw)
+
+            if role == "broadcaster":
+                # Forward offer / ICE to ALL viewers
+                dead = []
+                for v in room["viewers"]:
+                    try:
+                        await v.send_text(raw)
+                    except Exception:
+                        dead.append(v)
+                for d in dead:
+                    room["viewers"].remove(d)
+            else:
+                # Forward answer / ICE back to broadcaster
+                if room["broadcaster"]:
+                    try:
+                        await room["broadcaster"].send_text(raw)
+                    except Exception:
+                        room["broadcaster"] = None
+
+    except (WebSocketDisconnect, Exception) as exc:
+        print(f"[WebRTC] {role} left room '{room_id}': {exc}")
+        if role == "broadcaster":
+            room["broadcaster"] = None
+            # Notify viewers that the stream ended
+            for v in room["viewers"]:
+                try:
+                    await v.send_text(json.dumps({"type": "broadcaster_left"}))
+                except Exception:
+                    pass
+        else:
+            if websocket in room["viewers"]:
+                room["viewers"].remove(websocket)
+        # Clean up empty rooms
+        if room["broadcaster"] is None and not room["viewers"]:
+            _webrtc_rooms.pop(room_id, None)
 
 
 # ========== LEGACY ENDPOINTS (for backward compatibility) ==========

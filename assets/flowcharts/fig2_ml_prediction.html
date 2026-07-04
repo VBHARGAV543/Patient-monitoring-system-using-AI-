@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FIG. 2</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Times New Roman', Times, serif; background: #fff; color: #000; padding: 40px 32px; }
+    header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 6px; }
+    header h1 { font-size: 1.15rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; }
+    header p { font-size: 0.85rem; margin-top: 4px; }
+    .fig-label { text-align: center; font-size: 0.85rem; margin: 8px 0 20px; font-style: italic; }
+    .diagram-wrapper { max-width: 1100px; margin: 0 auto; overflow-x: auto; }
+    .mermaid { display: flex; justify-content: center; }
+    footer { text-align: center; border-top: 1px solid #000; margin-top: 36px; padding-top: 10px; font-size: 0.78rem; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Adaptive Patient Monitoring and Context-Aware Clinical Alert Management System Using Wearable Bands</h1>
+  <p>Method and System for Real-Time Vital Sign Acquisition, ML-Based Risk Classification, and Proximity-Aware Alarm Routing</p>
+</header>
+<p class="fig-label">FIG. 2 &mdash; ML Feature Engineering and Prediction Pipeline</p>
+<div class="diagram-wrapper">
+  <div class="mermaid">
+flowchart TD
+
+    IN(["Input: Complete 7-Vital Reading
+    from FIG. 1, Step 113"]) --> P["Step 118: Construct Feature Vector
+    7 vitals + age + medication category flags
+    + disease one-hot encoding + allergy indicator
+    Approximately 20 features total"]
+
+    P --> Q1["Step 119: Compute NEWS2 Score
+    National Early Warning Score 2
+    Rule-based clinical standard
+    Inputs: HR, SpO2, BP, RR, Temp"]
+    P --> Q2{"Step 120: Select
+    Ward-Specific Classifier Model"}
+
+    Q1 --> Q1a{"Step 119a: NEWS2 Score Range?"}
+    Q1a -->|"0 to 4"| Q1b["Low Risk
+    Routine monitoring"]
+    Q1a -->|"5 to 6"| Q1c["Medium Risk
+    Increased monitoring required"]
+    Q1a -->|"7 or above"| Q1d["High Risk
+    Urgent clinical review"]
+
+    Q2 -->|"General Ward"| R1["Step 121a: Random Forest Classifier
+    general_model.pkl
+    Trained on general ward patient dataset
+    Features: vitals, disease, medications, age, allergies"]
+    Q2 -->|"Critical Ward"| R2["Step 121b: Random Forest Classifier
+    critical_model.pkl
+    Trained on critical ward patient dataset
+    Higher sensitivity threshold applied"]
+
+    R1 --> S["Step 122: ML Classification Output
+    Class 0: Vitals within safe range
+    Class 1: Alarm condition detected"]
+    R2 --> S
+
+    Q1b --> T["Step 123: Combined Risk Assessment
+    Aggregate NEWS2 classification level
+    and Random Forest classifier output"]
+    Q1c --> T
+    Q1d --> T
+    S --> T
+
+    T --> OUT(["Output: Combined Risk Score
+    Proceed to FIG. 3 Alarm Policy Engine"])
+  </div>
+</div>
+<footer>
+  Adaptive Patient Monitoring and Context-Aware Clinical Alert Management System Using Wearable Bands &mdash; FIG. 2 of 4
+</footer>
+<script>
+  mermaid.initialize({
+    startOnLoad: true, theme: 'base', flowchart: { curve: 'linear', nodeSpacing: 50, rankSpacing: 55, padding: 16 },
+    themeVariables: { primaryColor: '#ffffff', primaryTextColor: '#000000', primaryBorderColor: '#000000',
+      lineColor: '#000000', secondaryColor: '#ffffff', tertiaryColor: '#ffffff',
+      edgeLabelBackground: '#ffffff', fontFamily: 'Times New Roman, Times, serif', fontSize: '13px' }
+  });
+</script>
+</body>
+</html>

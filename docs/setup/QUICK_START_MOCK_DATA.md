@@ -251,7 +251,7 @@ GET    /docs                       # Interactive API docs
 ## 📚 Documentation
 
 - **`MOCK_DATA_IMPLEMENTATION.md`** - Complete technical documentation
-- **`backend/DATABASE_MIGRATION.md`** - Database update guide
+- **`docs/backend/DATABASE_MIGRATION.md`** - Database update guide
 - **`backend/database_schema.sql`** - Full schema reference
 - **`backend/mock_data.py`** - Mock data generator code
 

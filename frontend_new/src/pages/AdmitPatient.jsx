@@ -27,7 +27,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { admitPatient, getActivePatient, getDiseases, getDiseaseInfo } from '../services/api';
+import { admitPatient, getActivePatient, getDiseases, getDiseaseInfo, resetBand } from '../services/api';
 import { usePatientStore } from '../stores/patientStore';
 
 // Validation schema
@@ -64,6 +64,7 @@ const AdmitPatient = () => {
   
   const [bandStatus, setBandStatus] = useState({ available: false, checking: true });
   const [submitting, setSubmitting] = useState(false);
+  const [releasing, setReleasing] = useState(false);
   const [diseases, setDiseases] = useState([]);
   const [diseaseInfo, setDiseaseInfo] = useState(null);
   const [loadingDiseases, setLoadingDiseases] = useState(false);
@@ -135,6 +136,27 @@ const AdmitPatient = () => {
 
     loadDiseaseInfo();
   }, [selectedDisease, patientType]);
+
+  // Force-release band handler
+  const handleForceRelease = async () => {
+    setReleasing(true);
+    try {
+      const result = await resetBand();
+      toast.success(result.message || 'Band released successfully');
+      // Re-check band status immediately
+      const activePatient = await getActivePatient();
+      setBandStatus({
+        available: !activePatient,
+        checking: false,
+        currentPatient: activePatient,
+      });
+    } catch (error) {
+      console.error('Error releasing band:', error);
+      toast.error('Failed to release band');
+    } finally {
+      setReleasing(false);
+    }
+  };
 
   // Check band availability
   useEffect(() => {
@@ -246,9 +268,24 @@ const AdmitPatient = () => {
           </Box>
 
           {bandStatus.currentPatient && (
-            <Alert severity="warning" sx={{ mb: 3 }}>
-              Band is currently assigned to patient: <strong>{bandStatus.currentPatient.name}</strong>.
-              Please discharge the current patient before admitting a new one.
+            <Alert
+              severity="warning"
+              sx={{ mb: 3 }}
+              action={
+                <Button
+                  color="warning"
+                  size="small"
+                  variant="outlined"
+                  onClick={handleForceRelease}
+                  disabled={releasing}
+                  startIcon={releasing ? <CircularProgress size={14} color="inherit" /> : null}
+                >
+                  {releasing ? 'Releasing...' : 'Force Release'}
+                </Button>
+              }
+            >
+              Band is currently assigned to: <strong>{bandStatus.currentPatient.name}</strong>.
+              Discharge them first, or use <strong>Force Release</strong> to clear the band.
             </Alert>
           )}
 

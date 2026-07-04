@@ -26,7 +26,6 @@ import {
   Favorite,
   Opacity,
   Thermostat,
-  MonitorHeart,
   LocalHospital,
   Sensors,
   Person,
@@ -596,38 +595,7 @@ const Dashboard = () => {
             />
           </Grid>
 
-          {/* Blood Pressure Systolic */}
-          <Grid item xs={12} sm={6} md={4}>
-            <VitalCard
-              icon={<MonitorHeart />}
-              title="BP (Systolic)"
-              value={currentVitals?.BP_sys}
-              unit="mmHg"
-              status={vitalStatuses.BP_sys}
-            />
-          </Grid>
 
-          {/* Blood Pressure Diastolic */}
-          <Grid item xs={12} sm={6} md={4}>
-            <VitalCard
-              icon={<MonitorHeart />}
-              title="BP (Diastolic)"
-              value={currentVitals?.BP_dia}
-              unit="mmHg"
-              status={vitalStatuses.BP_dia}
-            />
-          </Grid>
-
-          {/* Blood Glucose */}
-          <Grid item xs={12} sm={6} md={4}>
-            <VitalCard
-              icon={<LocalHospital />}
-              title="Blood Glucose"
-              value={currentVitals?.Glucose}
-              unit="mg/dL"
-              status={vitalStatuses.Glucose}
-            />
-          </Grid>
         </Grid>
       </Container>
 
